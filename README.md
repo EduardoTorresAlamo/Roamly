@@ -1,6 +1,6 @@
 # Roamly
 
-Travel planning app. Create trips, drop pins on a map, browse nearby points of interest, and track your itinerary — all stored locally in the browser.
+Travel planning app. Create trips, drop pins on a map, browse nearby points of interest, and track your itinerary. All data is stored locally in the browser.
 
 ## Stack
 
@@ -18,9 +18,9 @@ Travel planning app. Create trips, drop pins on a map, browse nearby points of i
 - Per-trip detail view with an interactive map
 - Geocoding to search and pin destinations
 - Nearby POI discovery (restaurants, cafes, museums, parks, etc.) via Overpass API
-- `.ics` calendar import — pull in trips from exported calendar files
+- `.ics` calendar import to pull in trips from exported calendar files
 - Activity icons tied to trip categories
-- All data persists in `localStorage` — no backend, no account required
+- All data persists in `localStorage` with no backend and no account required
 
 ## Getting started
 
@@ -41,11 +41,11 @@ npm run lint     # ESLint
 
 ## Notes
 
-POI lookups hit the public Overpass API — no API key needed, but requests are rate-limited by the endpoint. Geocoding uses a free public service.
+POI lookups hit the public Overpass API with no API key needed, but requests are rate-limited by the endpoint. Geocoding uses a free public service.
 
 ## Data Sources & Limitations
 
-- **Geocoding:** OpenStreetMap Nominatim (free, public, rate-limited — 1 req/sec). No API key required.
+- **Geocoding:** OpenStreetMap Nominatim (free, public, rate-limited to 1 req/sec). No API key required.
 - **Points of Interest:** Overpass API (free, rate-limited). Requests may be slow or fail during peak usage.
 - **Persistence:** All trip data lives in browser `localStorage`. Clearing browser data deletes trips permanently.
 - **No backend:** The app is entirely client-side. There is no account system or cloud sync.
