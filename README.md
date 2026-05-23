@@ -42,3 +42,10 @@ npm run lint     # ESLint
 ## Notes
 
 POI lookups hit the public Overpass API — no API key needed, but requests are rate-limited by the endpoint. Geocoding uses a free public service.
+
+## Data Sources & Limitations
+
+- **Geocoding:** OpenStreetMap Nominatim (free, public, rate-limited — 1 req/sec). No API key required.
+- **Points of Interest:** Overpass API (free, rate-limited). Requests may be slow or fail during peak usage.
+- **Persistence:** All trip data lives in browser `localStorage`. Clearing browser data deletes trips permanently.
+- **No backend:** The app is entirely client-side. There is no account system or cloud sync.
