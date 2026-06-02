@@ -11,9 +11,19 @@
 
 import { geocodePlace } from './geocoding'
 
+/**
+ * A resolved destination image with optional coordinates.
+ *
+ * Coordinates are sourced from Unsplash photo location metadata when available,
+ * falling back to Nominatim geocoding. They are used to center the map on the
+ * destination when the trip is opened.
+ */
 interface UnsplashResult {
+  /** Full-resolution image URL (1920px wide) for the trip hero */
   url: string
+  /** Thumbnail URL (600px wide) for use in TripCard to reduce bandwidth */
   thumb: string
+  /** Photographer name for the Unsplash attribution requirement */
   attribution: string
   lat?: number
   lon?: number
@@ -168,9 +178,20 @@ const DEFAULT: UnsplashResult = {
   attribution: 'Dariusz Sankowski',
 }
 
+/**
+ * Looks up a destination in the curated image map using case-insensitive matching.
+ *
+ * Exact match is tried first; then substring matching handles inputs like
+ * "Walt Disney World" matching the "disney" and "walt disney" keys.
+ *
+ * @param destination - User-supplied destination string
+ * @returns A curated UnsplashResult if a match is found, otherwise null
+ */
 function findCurated(destination: string): UnsplashResult | null {
   const lower = destination.toLowerCase()
+  // Fast path: exact lowercase match
   if (CURATED[lower]) return CURATED[lower]
+  // Slow path: partial substring match to handle aliases like "Walt Disney World"
   for (const [key, val] of Object.entries(CURATED)) {
     if (lower.includes(key) || key.includes(lower)) return val
   }

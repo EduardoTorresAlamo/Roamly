@@ -15,10 +15,27 @@ interface CalendarImportModalProps {
   onClose: () => void
 }
 
+/**
+ * Controls which content panel is shown in the multi-step import wizard.
+ *   upload    -- file drag-and-drop or picker
+ *   preview   -- event selection checklist with detected trip dates
+ *   importing -- async spinner while the trip is being created
+ *   done      -- success screen with a link to the new trip
+ */
 type Step = 'upload' | 'preview' | 'importing' | 'done'
 
+/**
+ * Converts a parsed ICSEvent into an Activity shape compatible with TripContext.
+ *
+ * The conversion slices HH:mm from the full ISO datetime string because Roamly
+ * stores times as HH:mm strings rather than full timestamps -- full timestamps
+ * would require timezone handling that is out of scope for this release.
+ *
+ * @param event - Parsed ICS event from the user's calendar file
+ * @returns Activity data (without id) ready to push into a DayPlan
+ */
 function eventToActivity(event: ICSEvent): Omit<Activity, 'id'> {
-  // Extract HH:mm from ISO datetime
+  // Slice characters 11-16 from "YYYY-MM-DDTHH:MM:SS" to get "HH:MM"
   const timeFrom = (iso?: string) => iso ? iso.slice(11, 16) : '00:00'
 
   if (event.type === 'flight') {
@@ -50,6 +67,21 @@ function eventToActivity(event: ICSEvent): Omit<Activity, 'id'> {
   }
 }
 
+/**
+ * Multi-step wizard for importing a trip from an ICS (iCalendar) file.
+ *
+ * Steps:
+ *   1. upload   -- Drag-and-drop or file picker for an .ics file
+ *   2. preview  -- Select which events to include; displays detected trip dates
+ *   3. importing -- Async step: fetches destination image and creates the trip
+ *   4. done     -- Success screen with a link to the new trip
+ *
+ * ICS files can be exported from Apple Calendar (File > Export), Google Calendar
+ * (gear > Settings > Import & export), or downloaded from flight/hotel booking emails.
+ *
+ * @param open - Whether the dialog is visible
+ * @param onClose - Callback to close the dialog
+ */
 export default function CalendarImportModal({ open, onClose }: CalendarImportModalProps) {
   const { addTripFull } = useTrips()
   const navigate = useNavigate()
@@ -62,6 +94,7 @@ export default function CalendarImportModal({ open, onClose }: CalendarImportMod
   const [error, setError] = useState('')
   const [importedTripId, setImportedTripId] = useState('')
 
+  /** Resets all wizard state back to the initial upload step. */
   function reset() {
     setStep('upload')
     setEvents([])
@@ -71,11 +104,17 @@ export default function CalendarImportModal({ open, onClose }: CalendarImportMod
     setImportedTripId('')
   }
 
+  /** Resets wizard state and calls the parent close callback. */
   function handleClose() {
     reset()
     onClose()
   }
 
+  /**
+   * Reads the selected .ics file, parses its events, and advances to the preview step.
+   *
+   * @param file - The File object from the file picker or drag-and-drop event
+   */
   async function handleFile(file: File) {
     setError('')
     try {
@@ -99,12 +138,24 @@ export default function CalendarImportModal({ open, onClose }: CalendarImportMod
     }
   }
 
+  /**
+   * Handles a file drop onto the drop-zone div.
+   * Reads the first dropped file; additional files are ignored.
+   *
+   * @param e - React drag event from the drop-zone element
+   */
   function handleDrop(e: React.DragEvent) {
     e.preventDefault()
     const file = e.dataTransfer.files[0]
     if (file) handleFile(file)
   }
 
+  /**
+   * Toggles an event's inclusion in the import selection set.
+   * Uses functional setState to avoid stale closure over the previous set.
+   *
+   * @param uid - ICS UID of the event to toggle
+   */
   function toggleEvent(uid: string) {
     setSelected((prev) => {
       const next = new Set(prev)
@@ -114,19 +165,27 @@ export default function CalendarImportModal({ open, onClose }: CalendarImportMod
     })
   }
 
+  /**
+   * Builds the trip from selected events, fetches a destination image,
+   * persists the trip via TripContext, and advances to the done step.
+   */
   async function handleImport() {
     if (!tripMeta || !events.length) return
     setStep('importing')
 
+    // Fetch the destination image (Unsplash or curated fallback) before building the trip
     const imageData = await fetchDestinationImage(tripMeta.destination)
+    // Generate empty DayPlan slots for the full trip date range
     const days = generateDayPlans(tripMeta.startDate, tripMeta.endDate)
 
-    // Place each selected event on the right day
+    // Place each selected event into the correct day based on its DTSTART date
     const selectedEvents = events.filter((e) => selected.has(e.uid))
     for (const event of selectedEvents) {
+      // Slice YYYY-MM-DD from the ISO datetime string to match DayPlan.date format
       const eventDate = event.dtStart?.slice(0, 10)
       if (!eventDate) continue
       const day = days.find((d) => d.date === eventDate)
+      // Events whose date falls outside the trip range are silently dropped
       if (!day) continue
       day.activities.push({ ...eventToActivity(event), id: generateId() })
     }
@@ -147,6 +206,12 @@ export default function CalendarImportModal({ open, onClose }: CalendarImportMod
     setStep('done')
   }
 
+  /**
+   * Returns a Lucide icon element for the given ICS event type.
+   *
+   * @param type - Detected ICS event type (flight, hotel, or other)
+   * @returns The corresponding icon element for use in the event list
+   */
   function getEventIcon(type: ICSEvent['type']) {
     if (type === 'flight') return <Plane className="w-4 h-4 text-blue-400" />
     if (type === 'hotel') return <Building2 className="w-4 h-4 text-purple-400" />

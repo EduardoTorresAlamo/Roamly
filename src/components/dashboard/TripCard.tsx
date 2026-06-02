@@ -4,6 +4,8 @@ import type { Trip } from '@/types'
 import { formatDateRange, getTripDurationDays } from '@/utils/dates'
 import { cn } from '@/lib/utils'
 
+// Fallback gradient classes used when a trip has no Unsplash cover image.
+// Six variants means destinations map to visually distinct colors via the hash below.
 const GRADIENT_FALLBACKS = [
   'from-violet-700 via-purple-800 to-indigo-900',
   'from-sky-700 via-blue-800 to-indigo-900',
@@ -13,6 +15,14 @@ const GRADIENT_FALLBACKS = [
   'from-amber-700 via-orange-800 to-red-900',
 ]
 
+/**
+ * Deterministically maps a destination string to a gradient index by summing
+ * the char codes of its characters. The same destination always produces the
+ * same color, so the card looks consistent across page reloads.
+ *
+ * @param str - Destination name string
+ * @returns A non-negative integer suitable for use as an array index via modulo
+ */
 function hashDestination(str: string): number {
   return str.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0)
 }
@@ -22,13 +32,30 @@ interface TripCardProps {
   onDelete: () => void
 }
 
+/**
+ * Card component displaying a trip's cover image (or gradient fallback),
+ * destination name, date range, and a delete button.
+ *
+ * The entire card is clickable and navigates to the TripDetail page.
+ *
+ * @param trip - Trip data to display
+ * @param onDelete - Callback invoked when the user confirms deletion
+ */
 export default function TripCard({ trip, onDelete }: TripCardProps) {
   const navigate = useNavigate()
+  // Pick a gradient that is stable for this destination name
   const gradient = GRADIENT_FALLBACKS[hashDestination(trip.destination) % GRADIENT_FALLBACKS.length]
   const duration = getTripDurationDays(trip.startDate, trip.endDate)
   const hasCover = !!trip.coverImageThumb
 
+  /**
+   * Handles the delete button click inside the card.
+   * Stops propagation so the card's navigate onClick does not also fire.
+   *
+   * @param e - React mouse event from the delete button
+   */
   function handleDelete(e: React.MouseEvent) {
+    // Stop propagation so the card's onClick (navigate) does not also fire
     e.stopPropagation()
     onDelete()
   }

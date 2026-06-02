@@ -7,24 +7,36 @@ import AddTripModal from '@/components/modals/AddTripModal'
 import CalendarImportModal from '@/components/modals/CalendarImportModal'
 import { formatDate } from '@/utils/dates'
 
-// --- Mini Calendar Widget ---
+/**
+ * Compact interactive calendar widget showing the current month.
+ *
+ * The user can navigate between months with the chevron buttons. Today's date
+ * is highlighted. Individual days are not interactive; this is a display-only
+ * widget for temporal context rather than a date picker.
+ */
 function CalendarWidget() {
   const today = new Date()
+  // viewDate tracks which month is shown; initialized to the 1st of the current month
   const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
 
   const year = viewDate.getFullYear()
   const month = viewDate.getMonth()
   const monthName = viewDate.toLocaleString('en-US', { month: 'long' })
 
+  // First day of month (0=Sunday) determines how many empty leading cells to render
   const firstDay = new Date(year, month, 1).getDay()
+  // Day 0 of the next month equals the last day of the current month
   const daysInMonth = new Date(year, month + 1, 0).getDate()
 
+  // Fill leading null cells so dates align with the correct weekday column
   const cells: (number | null)[] = [...Array(firstDay).fill(null)]
   for (let d = 1; d <= daysInMonth; d++) cells.push(d)
 
   const dayNames = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
 
+  /** Navigate to the previous month */
   function prev() { setViewDate(new Date(year, month - 1, 1)) }
+  /** Navigate to the next month */
   function next() { setViewDate(new Date(year, month + 1, 1)) }
 
   return (
@@ -69,8 +81,16 @@ function CalendarWidget() {
   )
 }
 
-// --- Trip Photos Gallery Widget ---
+/**
+ * Masonry-style 3x2 thumbnail grid of trip cover photos shown in the left sidebar.
+ *
+ * Only trips that have a coverImageThumb are included; the widget is hidden entirely
+ * when no trips have photos so the sidebar does not show an empty panel.
+ *
+ * @param trips - Array of trip objects (only coverImageThumb and destination are used)
+ */
 function PhotoGalleryWidget({ trips }: { trips: { coverImageThumb?: string; destination: string }[] }) {
+  // Filter out trips without a cover image and cap at 6 to fill the 3x2 grid
   const photosTrips = trips.filter((t) => t.coverImageThumb).slice(0, 6)
   if (photosTrips.length === 0) return null
 
@@ -88,7 +108,17 @@ function PhotoGalleryWidget({ trips }: { trips: { coverImageThumb?: string; dest
   )
 }
 
-// --- Main Dashboard ---
+/**
+ * Main dashboard page showing the trip list, a mini calendar, and a photo gallery.
+ *
+ * The layout has three zones:
+ *   - Left sidebar (hidden on mobile): calendar widget + photo gallery
+ *   - Main panel: trip list with import and add-trip actions
+ *   - FAB: floating orange Add Trip button
+ *
+ * The sidebar and main panel fade to near-transparent when mapExpanded is true so
+ * the Leaflet map base layer shows through without being obscured by panel glass.
+ */
 export default function Dashboard() {
   const { trips, deleteTrip } = useTrips()
   const { mapExpanded } = useMapContext()

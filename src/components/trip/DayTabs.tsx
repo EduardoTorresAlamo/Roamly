@@ -9,9 +9,22 @@ interface DayTabsProps {
   onSelect: (id: string) => void
 }
 
+/**
+ * Horizontal scrollable tab strip for switching between days in a trip itinerary.
+ *
+ * Each tab shows a day label ("Day 1") and its calendar date. The active tab
+ * is scrolled into view automatically using a ref, so that navigating via
+ * keyboard or programmatic selection on long trips keeps the active day visible.
+ *
+ * @param days - Ordered array of day plans for the trip
+ * @param selectedDayId - Id of the currently active day
+ * @param onSelect - Callback invoked with the day id when a tab is clicked
+ */
 export default function DayTabs({ days, selectedDayId, onSelect }: DayTabsProps) {
   const activeRef = useRef<HTMLButtonElement>(null)
 
+  // Scroll the active tab into the horizontal center of the strip whenever selection changes.
+  // This ensures the selected day is always visible even on trips with many days.
   useEffect(() => {
     activeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
   }, [selectedDayId])

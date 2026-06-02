@@ -6,6 +6,15 @@ interface HeroSectionProps {
   onAddTrip: () => void
 }
 
+/**
+ * Decorative hero banner displayed at the top of the Dashboard.
+ *
+ * Shows a trip count summary and a primary Add Trip button. The decorative
+ * circle elements are purely visual and convey no information.
+ *
+ * @param tripCount - Total number of saved trips, used to customize the headline copy
+ * @param onAddTrip - Callback to open the AddTripModal
+ */
 export default function HeroSection({ tripCount, onAddTrip }: HeroSectionProps) {
   return (
     <div className="rounded-3xl bg-gradient-to-br from-violet-500 via-purple-600 to-blue-600 p-6 sm:p-8 mb-6 text-white overflow-hidden relative">

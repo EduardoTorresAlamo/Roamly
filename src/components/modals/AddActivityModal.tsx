@@ -17,10 +17,16 @@ interface AddActivityModalProps {
   open: boolean
   onClose: () => void
   onAdd: (activity: Omit<Activity, 'id'>) => void
+  /** Trip destination passed to geocodeActivity to improve coordinate accuracy */
   tripDestination?: string
 }
 
-// Shared glass field component
+/**
+ * Labelled form field wrapper with consistent glass-morphism styling.
+ *
+ * @param label - Field label text rendered in uppercase small caps
+ * @param children - The input element(s) to render inside the field
+ */
 function GlassField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
@@ -30,16 +36,31 @@ function GlassField({ label, children }: { label: string; children: React.ReactN
   )
 }
 
-// --- Type-specific forms ---
-// Each form receives onSubmit and a geocoding helper; they call onSubmit with the
-// geocode-enriched activity data. The parent handles the async flow.
+// Type-specific sub-forms
+// Each form is self-contained with its own local state. When submitted, it calls
+// onSubmit with the raw activity data; the parent AddActivityModal then handles
+// the async geocoding step before persisting the activity.
 
+/**
+ * Form for adding a flight activity.
+ * Geocoding is skipped for flights because airport coordinates are less useful
+ * for map pinning than the actual activity location.
+ */
+/**
+ * Form for adding a flight activity.
+ * Geocoding is skipped for flights because an airline name/number does not
+ * geocode to a useful point-of-interest on the destination map.
+ *
+ * @param onSubmit - Called with assembled activity data on valid submission
+ * @param isGeocoding - When true, the submit button shows a loading spinner
+ */
 function FlightForm({ onSubmit, isGeocoding }: { onSubmit: (data: Omit<Activity, 'id'>) => void; isGeocoding: boolean }) {
   const [airline, setAirline] = useState('')
   const [flightNumber, setFlightNumber] = useState('')
   const [departure, setDeparture] = useState('')
   const [arrival, setArrival] = useState('')
 
+  /** Validates required fields then calls onSubmit with the flight data. */
   function submit(e: React.SyntheticEvent) {
     e.preventDefault()
     if (!airline.trim() || !departure) return
@@ -74,11 +95,18 @@ function FlightForm({ onSubmit, isGeocoding }: { onSubmit: (data: Omit<Activity,
   )
 }
 
+/**
+ * Form for adding a lodging activity (hotel, hostel, Airbnb, etc.).
+ *
+ * @param onSubmit - Called with assembled activity data on valid submission
+ * @param isGeocoding - When true, the submit button shows a loading spinner
+ */
 function LodgingForm({ onSubmit, isGeocoding }: { onSubmit: (data: Omit<Activity, 'id'>) => void; isGeocoding: boolean }) {
   const [hotel, setHotel] = useState('')
   const [checkIn, setCheckIn] = useState('')
   const [checkOut, setCheckOut] = useState('')
 
+  /** Validates that a hotel name is present then calls onSubmit. */
   function submit(e: React.SyntheticEvent) {
     e.preventDefault()
     if (!hotel.trim()) return
@@ -105,10 +133,17 @@ function LodgingForm({ onSubmit, isGeocoding }: { onSubmit: (data: Omit<Activity
   )
 }
 
+/**
+ * Form for adding a restaurant or dining reservation.
+ *
+ * @param onSubmit - Called with assembled activity data on valid submission
+ * @param isGeocoding - When true, the submit button shows a loading spinner
+ */
 function DiningForm({ onSubmit, isGeocoding }: { onSubmit: (data: Omit<Activity, 'id'>) => void; isGeocoding: boolean }) {
   const [restaurant, setRestaurant] = useState('')
   const [time, setTime] = useState('')
 
+  /** Validates that a restaurant name is present then calls onSubmit. */
   function submit(e: React.SyntheticEvent) {
     e.preventDefault()
     if (!restaurant.trim()) return
@@ -130,11 +165,18 @@ function DiningForm({ onSubmit, isGeocoding }: { onSubmit: (data: Omit<Activity,
   )
 }
 
+/**
+ * Form for adding a generic activity (sightseeing, tours, experiences, etc.).
+ *
+ * @param onSubmit - Called with assembled activity data on valid submission
+ * @param isGeocoding - When true, the submit button shows a loading spinner
+ */
 function ActivityForm({ onSubmit, isGeocoding }: { onSubmit: (data: Omit<Activity, 'id'>) => void; isGeocoding: boolean }) {
   const [name, setName] = useState('')
   const [time, setTime] = useState('')
   const [notes, setNotes] = useState('')
 
+  /** Validates that an activity name is present then calls onSubmit. */
   function submit(e: React.SyntheticEvent) {
     e.preventDefault()
     if (!name.trim()) return
@@ -164,33 +206,62 @@ function ActivityForm({ onSubmit, isGeocoding }: { onSubmit: (data: Omit<Activit
   )
 }
 
-// --- Main Modal ---
+/**
+ * Two-step modal for adding a new activity to a trip day.
+ *
+ * Step 1: Type picker (flight, lodging, dining, activity)
+ * Step 2: Type-specific form with geocoding on submit
+ *
+ * After the user submits the form, the modal attempts to geocode the activity title
+ * via Nominatim. If geocoding resolves within 3 seconds, the coordinates are
+ * attached before the activity is saved so it appears as a pin on the map.
+ * If geocoding times out or fails, the activity is saved without coordinates.
+ *
+ * @param open - Whether the dialog is visible
+ * @param onClose - Callback to close the dialog
+ * @param onAdd - Callback invoked with the completed activity (minus id)
+ * @param tripDestination - Trip destination used to improve geocoding accuracy
+ */
 export default function AddActivityModal({ open, onClose, onAdd, tripDestination }: AddActivityModalProps) {
   const [selectedType, setSelectedType] = useState<ActivityType | null>(null)
   const [isGeocoding, setIsGeocoding] = useState(false)
 
+  /**
+   * Dismisses the modal and resets type selection.
+   * Blocked while geocoding is in flight to prevent data loss.
+   */
   function handleClose() {
-    if (isGeocoding) return  // prevent close during geocoding
+    // Block dismissal while geocoding to prevent the activity being lost mid-request
+    if (isGeocoding) return
     setSelectedType(null)
     onClose()
   }
 
+  /**
+   * Geocodes the activity (when applicable) then calls onAdd and closes the modal.
+   *
+   * @param data - Activity data submitted from one of the type-specific sub-forms
+   */
   async function handleAdd(data: Omit<Activity, 'id'>) {
-    // Skip geocoding for flights — airport data is less useful for map pins
+    // Flights are excluded from geocoding because an airline name/number does not
+    // geocode to a useful point-of-interest on the destination map
     const canGeocode = data.type !== 'flight' && tripDestination
 
     if (canGeocode) {
       setIsGeocoding(true)
       try {
+        // Race geocoding against a 3 s timeout so a slow Nominatim response does not
+        // block the user from saving their activity
         const geo = await Promise.race([
           geocodeActivity(data.title, tripDestination),
           new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
         ])
         if (geo) {
+          // Attach coordinates and full display name to the activity before saving
           data = { ...data, lat: geo.lat, lon: geo.lon, address: geo.displayName }
         }
       } catch {
-        // geocoding failed — continue without coords
+        // Geocoding failure is non-fatal; the activity is saved without coordinates
       } finally {
         setIsGeocoding(false)
       }

@@ -6,17 +6,39 @@ import { cn } from '@/lib/utils'
 interface ActivityItemProps {
   activity: Activity
   onDelete: () => void
+  /** Called when the user taps the map pin button; only passed if the activity has coordinates */
   onFocus?: () => void
 }
 
+/**
+ * Converts a 24-hour HH:mm time string to a 12-hour AM/PM display string.
+ *
+ * Returns an empty string for midnight ("00:00") which is used as the default
+ * startTime placeholder when the user does not specify a time.
+ *
+ * @param time - Time string in HH:mm format
+ * @returns Formatted time string, e.g. "9:30 AM", or "" for 00:00
+ */
 function formatTime(time: string): string {
   if (!time || time === '00:00') return ''
   const [hours, minutes] = time.split(':').map(Number)
   const period = hours >= 12 ? 'PM' : 'AM'
+  // Convert 0 to 12 for 12-hour display (0 % 12 === 0, so || 12 handles midnight/noon)
   const displayHours = hours % 12 || 12
   return `${displayHours}:${String(minutes).padStart(2, '0')} ${period}`
 }
 
+/**
+ * Renders a single activity row in the day timeline.
+ *
+ * Displays a colored icon, activity title, time range, optional notes, and
+ * action buttons. The map-pin button only appears when the activity has been
+ * geocoded (has lat/lon), keeping the UI clean for un-geocoded activities like flights.
+ *
+ * @param activity - The activity to render
+ * @param onDelete - Callback to remove this activity from the day
+ * @param onFocus - Optional callback to focus the activity marker on the map
+ */
 export default function ActivityItem({ activity, onDelete, onFocus }: ActivityItemProps) {
   const meta = ACTIVITY_META[activity.type]
   const Icon = meta.icon

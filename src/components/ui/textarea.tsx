@@ -3,6 +3,12 @@ import { cn } from '@/lib/utils'
 
 export type TextareaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement>
 
+/**
+ * Styled textarea element matching the Roamly form field design language.
+ *
+ * resize-none is applied by default to prevent layout-breaking manual resizes
+ * inside modal dialogs. Callers can override via className if resizing is needed.
+ */
 const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({ className, ...props }, ref) => {
   return (
     <textarea

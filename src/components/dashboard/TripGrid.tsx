@@ -6,6 +6,14 @@ interface TripGridProps {
   onDeleteTrip: (tripId: string) => void
 }
 
+/**
+ * Renders the list of trip cards in a responsive two-column grid.
+ *
+ * Shows an empty state prompt when there are no trips yet.
+ *
+ * @param trips - Array of trip objects to display
+ * @param onDeleteTrip - Callback invoked with the trip id when a card's delete button is clicked
+ */
 export default function TripGrid({ trips, onDeleteTrip }: TripGridProps) {
   if (trips.length === 0) {
     return (

@@ -2,6 +2,12 @@ import { X, Utensils, Coffee, Beer, Landmark, BedDouble, TreePine, Star, MapPin,
 import { useMapContext } from '@/context/MapContext'
 import type { POI } from '@/utils/overpass'
 
+/**
+ * Maps a POI category to its corresponding Lucide icon component.
+ *
+ * @param category - POI category from the Overpass API result
+ * @returns The appropriate Lucide icon element
+ */
 function categoryIcon(category: POI['category']) {
   switch (category) {
     case 'restaurant': return <Utensils className="w-3.5 h-3.5" />
@@ -15,14 +21,34 @@ function categoryIcon(category: POI['category']) {
   }
 }
 
+/**
+ * Capitalizes the first letter of a POI category for display in the panel.
+ *
+ * @param c - Lowercase category string
+ * @returns Human-readable category label, e.g. "Restaurant"
+ */
 function categoryLabel(c: POI['category']) {
   return c.charAt(0).toUpperCase() + c.slice(1)
 }
 
+/**
+ * Formats a distance in metres to a compact human-readable label.
+ * Switches to kilometres with one decimal place once the value exceeds 1 000 m.
+ *
+ * @param m - Distance in metres
+ * @returns Formatted string, e.g. "350m" or "1.2km"
+ */
 function distanceLabel(m: number) {
   return m < 1000 ? `${m}m` : `${(m / 1000).toFixed(1)}km`
 }
 
+/**
+ * Floating panel that lists nearby points of interest fetched from Overpass API
+ * when the user taps an activity marker on the map.
+ *
+ * The panel is only visible when a marker is focused and there are POIs to display
+ * or a fetch is in progress. It dismisses via the X button or when clearFocus is called.
+ */
 export default function NearbyPanel() {
   const { focusedMarkerId, markers, recommendations, isLoadingRecs, clearFocus } = useMapContext()
 

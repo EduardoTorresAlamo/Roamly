@@ -18,6 +18,20 @@ interface AddTripModalProps {
   onClose: () => void
 }
 
+/**
+ * Modal dialog for creating a new trip.
+ *
+ * As the user types a destination, a debounced fetch retrieves a cover image
+ * from Unsplash (or the curated fallback map). The image and its associated
+ * coordinates are stored with the trip so the map can center on it and the
+ * card shows an attractive preview.
+ *
+ * The modal navigates directly to the new TripDetail page after creation
+ * so the user can start adding activities immediately.
+ *
+ * @param open - Whether the dialog is visible
+ * @param onClose - Callback to close the dialog without saving
+ */
 export default function AddTripModal({ open, onClose }: AddTripModalProps) {
   const { addTrip } = useTrips()
   const navigate = useNavigate()
@@ -27,7 +41,7 @@ export default function AddTripModal({ open, onClose }: AddTripModalProps) {
   const [endDate, setEndDate] = useState('')
   const [error, setError] = useState('')
 
-  // Image preview state
+  // Separate state fields for the image result avoid deeply nested object updates
   const [previewImage, setPreviewImage] = useState<string | null>(null)
   const [imageThumb, setImageThumb] = useState<string | null>(null)
   const [imageAttrib, setImageAttrib] = useState<string | null>(null)
@@ -35,11 +49,15 @@ export default function AddTripModal({ open, onClose }: AddTripModalProps) {
   const [imageLon, setImageLon] = useState<number | undefined>()
   const [imageFetching, setImageFetching] = useState(false)
 
+  // Ref used to cancel in-flight debounce timers on each keystroke
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Debounce destination image fetch
+  // Debounce the image fetch so we do not call Unsplash/Nominatim on every keystroke.
+  // 600 ms provides a good balance between responsiveness and API request volume.
+  // The effect cleanup cancels any pending timer when the destination changes again.
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
+    // Don't fetch for very short inputs -- they rarely produce good results
     if (destination.trim().length < 2) {
       setPreviewImage(null)
       return
@@ -58,9 +76,11 @@ export default function AddTripModal({ open, onClose }: AddTripModalProps) {
       }
     }, 600)
 
+    // Cancel pending timer if the user types again before the delay expires
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [destination])
 
+  /** Clears all form fields and image preview state so the modal is clean on next open. */
   function reset() {
     setDestination('')
     setStartDate('')
@@ -73,11 +93,17 @@ export default function AddTripModal({ open, onClose }: AddTripModalProps) {
     setImageLon(undefined)
   }
 
+  /** Resets form state and calls the parent close callback. */
   function handleClose() {
     reset()
     onClose()
   }
 
+  /**
+   * Validates the form, creates the trip via TripContext, and navigates to the new trip.
+   *
+   * @param e - Synthetic form submit or button click event
+   */
   async function handleSubmit(e: React.SyntheticEvent) {
     e.preventDefault()
     if (!destination.trim() || !startDate || !endDate) {

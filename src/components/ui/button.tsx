@@ -3,6 +3,12 @@ import { Slot } from '@radix-ui/react-slot'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
+/**
+ * Class-variance-authority config for the Button component.
+ *
+ * cva generates a type-safe variant system: the base classes always apply,
+ * and variant/size selections merge on top without conflicts.
+ */
 const buttonVariants = cva(
   'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.97]',
   {
@@ -32,11 +38,22 @@ const buttonVariants = cva(
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
+  /**
+   * When true, renders the button's children as the root element using Radix Slot.
+   * Useful for wrapping an <a> tag or React Router <Link> with button styles.
+   */
   asChild?: boolean
 }
 
+/**
+ * Accessible button primitive with configurable variant and size.
+ *
+ * Uses React.forwardRef so parent components can attach a ref to the DOM button
+ * element (e.g. for focus management or third-party animation libraries).
+ */
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, ...props }, ref) => {
+    // Slot renders the child element directly, merging props -- used for asChild pattern
     const Comp = asChild ? Slot : 'button'
     return <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props} />
   },

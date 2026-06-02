@@ -10,16 +10,34 @@ import AddActivityModal from '@/components/modals/AddActivityModal'
 import type { Activity } from '@/types'
 import { cn } from '@/lib/utils'
 
+/**
+ * Trip detail page displaying the day-by-day itinerary and the interactive map.
+ *
+ * The page has two visual modes toggled by the Map button:
+ *   Normal mode: hero image strip (32% height) + scrollable content panel below
+ *   Map mode: content panel collapses to a 48vh bottom sheet; the Leaflet map
+ *             fills the rest of the screen so activity markers are clearly visible
+ *
+ * Map synchronization:
+ *   - On page load, the map flies to the trip destination coordinates
+ *   - Each time the selected day tab changes, the marker layer is replaced with
+ *     only the geocoded activities for that day
+ *   - Tapping a marker focuses it, expands the map, and fetches nearby POIs
+ */
 export default function TripDetail() {
   const { tripId } = useParams<{ tripId: string }>()
   const { getTripById, addActivity, deleteActivity } = useTrips()
   const { setMarkers, flyTo, clearFocus, mapExpanded, setMapExpanded } = useMapContext()
   const trip = getTripById(tripId ?? '')
 
+  // Default to day 1 on initial render; lazy initializer avoids an extra render cycle
   const [selectedDayId, setSelectedDayId] = useState<string>(() => trip?.days[0]?.id ?? '')
   const [addModalOpen, setAddModalOpen] = useState(false)
 
-  // Center map on trip destination when page loads
+  // Center the map on this trip's destination whenever the tripId route param changes.
+  // clearFocus() dismisses any NearbyPanel left over from a previously viewed trip.
+  // The empty-ish dep array (only tripId) intentionally avoids re-running when flyTo
+  // or clearFocus references change -- this effect is "run when navigation changes".
   useEffect(() => {
     if (trip?.lat && trip?.lon) {
       flyTo(trip.lat, trip.lon, 12)
@@ -29,9 +47,11 @@ export default function TripDetail() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tripId])
 
-  // Update map markers whenever the selected day changes
+  // Resolve the selected day object; fall back to day 0 if selectedDayId is stale
   const selectedDay = trip?.days.find((d) => d.id === selectedDayId) ?? trip?.days[0]
 
+  // Sync map markers to the currently selected day's geocoded activities.
+  // Only activities with coordinates become map pins -- un-geocoded entries are excluded.
   useEffect(() => {
     if (!selectedDay) return
     const geoActivities = selectedDay.activities.filter((a) => a.lat != null && a.lon != null)
@@ -60,11 +80,18 @@ export default function TripDetail() {
 
   const duration = getTripDurationDays(trip.startDate, trip.endDate)
 
+  /**
+   * Adds a new activity to the currently selected day.
+   * The activity arrives from AddActivityModal already geocoded when possible.
+   */
   function handleAddActivity(activity: Omit<Activity, 'id'>) {
     if (!selectedDay) return
     addActivity(trip!.id, selectedDay.id, activity)
   }
 
+  /**
+   * Removes an activity from the currently selected day by its id.
+   */
   function handleDeleteActivity(activityId: string) {
     if (!selectedDay) return
     deleteActivity(trip!.id, selectedDay.id, activityId)

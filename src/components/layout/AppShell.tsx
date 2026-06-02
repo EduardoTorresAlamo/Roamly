@@ -6,11 +6,20 @@ import { useTrips } from '@/hooks/useTrips'
 import { useMapContext } from '@/context/MapContext'
 import { cn } from '@/lib/utils'
 
+/**
+ * Props accepted by the AppShell layout component.
+ */
 interface AppShellProps {
+  /** Page-level content to render inside the content layer above the map. */
   children: ReactNode
 }
 
-/** macOS-style top menu bar with Roamly branding and map toggle */
+/**
+ * macOS-style top menu bar with Roamly branding and a global map toggle button.
+ *
+ * The traffic lights are purely decorative and do not implement window management.
+ * The map toggle is mirrored in TripDetail's content panel for discoverability.
+ */
 function MacOSMenuBar() {
   const { mapExpanded, setMapExpanded } = useMapContext()
 
@@ -57,7 +66,15 @@ function MacOSMenuBar() {
   )
 }
 
-/** Centers the map on the first trip's coordinates on first load */
+/**
+ * Runs a one-time effect on app mount to center the Leaflet map on the first
+ * trip's saved coordinates. This ensures the map is not stuck on the default
+ * world-center view when the user has existing trips.
+ *
+ * The empty dependency array intentionally omits flyTo and trips to prevent
+ * re-triggering every time the trips list or flyTo reference changes; this
+ * is the desired "run once on mount" behavior.
+ */
 function MapCenterOnLoad() {
   const { trips } = useTrips()
   const { flyTo } = useMapContext()
@@ -67,19 +84,25 @@ function MapCenterOnLoad() {
     if (first?.lat && first?.lon) {
       flyTo(first.lat, first.lon, 10)
     }
-  // Only run once on mount
+  // Only run once on mount -- intentional empty-array exhaustive-deps bypass
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return null
 }
 
+/**
+ * Root layout shell that composes the full-screen map background, the menu bar,
+ * and the main content area into a single stacking context.
+ *
+ * @param children - Page-level content (Dashboard or TripDetail)
+ */
 export default function AppShell({ children }: AppShellProps) {
   return (
     <MapBackground>
       <MapCenterOnLoad />
       <MacOSMenuBar />
-      {/* Main content area below the menu bar */}
+      {/* Content area begins 48px below the menu bar (h-12 = 3rem = 48px) */}
       <div className="absolute inset-0 top-12 overflow-hidden">
         {children}
       </div>

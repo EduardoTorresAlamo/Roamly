@@ -3,6 +3,12 @@ import { cn } from '@/lib/utils'
 
 export type InputProps = React.InputHTMLAttributes<HTMLInputElement>
 
+/**
+ * Styled input element with consistent Roamly form field appearance.
+ *
+ * Forwards the ref to the underlying <input> so parent components can call
+ * .focus() or read the value imperatively when needed.
+ */
 const Input = React.forwardRef<HTMLInputElement, InputProps>(({ className, type, ...props }, ref) => {
   return (
     <input

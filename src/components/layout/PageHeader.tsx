@@ -4,10 +4,19 @@ import { ChevronLeft } from 'lucide-react'
 interface PageHeaderProps {
   title: string
   subtitle?: string
+  /** If provided, renders a back link pointing to this route */
   backTo?: string
   backLabel?: string
 }
 
+/**
+ * Reusable page header with an optional back-navigation link.
+ *
+ * @param title - Main heading text
+ * @param subtitle - Secondary description displayed below the title
+ * @param backTo - Route path for the back link; omit to hide the link
+ * @param backLabel - Label for the back link (defaults to "Back")
+ */
 export default function PageHeader({ title, subtitle, backTo, backLabel = 'Back' }: PageHeaderProps) {
   return (
     <div className="mb-6">
