@@ -53,8 +53,8 @@ function MacOSMenuBar() {
         className={cn(
           'flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all duration-200',
           mapExpanded
-            ? 'bg-accent/20 border-accent/50 text-accent-DEFAULT'
-            : 'border-white/12 text-white/50 hover:text-white hover:border-white/25 hover:bg-white/5',
+            ? 'bg-accent/20 border-accent/50 text-accent'
+            : 'border-white/[0.12] text-white/50 hover:text-white hover:border-white/25 hover:bg-white/5',
         )}
       >
         {mapExpanded

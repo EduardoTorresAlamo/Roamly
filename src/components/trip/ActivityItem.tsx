@@ -50,7 +50,7 @@ export default function ActivityItem({ activity, onDelete, onFocus }: ActivityIt
   return (
     <div className="group flex gap-3 items-start">
       {/* Icon circle */}
-      <div className={cn('w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 mt-0.5 border border-white/8', meta.bg)}>
+      <div className={cn('w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 mt-0.5 border border-white/[0.08]', meta.bg)}>
         <Icon className={cn('w-5 h-5', meta.color)} />
       </div>
 
@@ -81,7 +81,7 @@ export default function ActivityItem({ activity, onDelete, onFocus }: ActivityIt
             {hasCoords && onFocus && (
               <button
                 onClick={onFocus}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-white/30 hover:text-accent-DEFAULT hover:bg-accent/10 transition-all sm:opacity-0 sm:group-hover:opacity-100"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-white/30 hover:text-accent hover:bg-accent/10 transition-all sm:opacity-0 sm:group-hover:opacity-100"
                 aria-label="Show on map"
                 title="Show on map"
               >

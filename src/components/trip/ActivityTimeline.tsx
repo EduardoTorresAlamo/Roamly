@@ -27,7 +27,7 @@ export default function ActivityTimeline({ day, onDeleteActivity }: ActivityTime
   if (sorted.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-14 text-center">
-        <div className="w-14 h-14 rounded-full bg-white/5 border border-white/8 flex items-center justify-center mb-3">
+        <div className="w-14 h-14 rounded-full bg-white/5 border border-white/[0.08] flex items-center justify-center mb-3">
           <Sparkles className="w-7 h-7 text-white/20" />
         </div>
         <p className="text-white/30 font-medium text-sm">Nothing planned yet</p>
@@ -39,7 +39,7 @@ export default function ActivityTimeline({ day, onDeleteActivity }: ActivityTime
   return (
     <div className="relative">
       {/* Decorative vertical line connecting activity items in the timeline */}
-      <div className="absolute left-5 top-5 bottom-5 w-px bg-white/8 z-0" />
+      <div className="absolute left-5 top-5 bottom-5 w-px bg-white/[0.08] z-0" />
       <div className="relative z-10 space-y-3">
         {sorted.map((activity) => (
           <ActivityItem

@@ -51,6 +51,8 @@ export default function AddTripModal({ open, onClose }: AddTripModalProps) {
 
   // Ref used to cancel in-flight debounce timers on each keystroke
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Monotonic id so a slow, superseded fetch cannot overwrite a newer preview
+  const fetchIdRef = useRef(0)
 
   // Debounce the image fetch so we do not call Unsplash/Nominatim on every keystroke.
   // 600 ms provides a good balance between responsiveness and API request volume.
@@ -63,16 +65,23 @@ export default function AddTripModal({ open, onClose }: AddTripModalProps) {
       return
     }
     debounceRef.current = setTimeout(async () => {
+      const fetchId = ++fetchIdRef.current
       setImageFetching(true)
       try {
         const result = await fetchDestinationImage(destination.trim())
+        // Ignore stale responses: only the latest request may update the preview
+        if (fetchIdRef.current !== fetchId) return
         setPreviewImage(result.url)
         setImageThumb(result.thumb)
         setImageAttrib(result.attribution)
         setImageLat(result.lat)
         setImageLon(result.lon)
+      } catch (err) {
+        // A failed preview fetch is non-fatal -- the trip can be created without
+        // a cover image -- but it should not surface as an unhandled rejection
+        console.error('Destination image fetch failed', err)
       } finally {
-        setImageFetching(false)
+        if (fetchIdRef.current === fetchId) setImageFetching(false)
       }
     }, 600)
 

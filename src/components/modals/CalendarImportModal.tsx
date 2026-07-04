@@ -35,8 +35,13 @@ type Step = 'upload' | 'preview' | 'importing' | 'done'
  * @returns Activity data (without id) ready to push into a DayPlan
  */
 function eventToActivity(event: ICSEvent): Omit<Activity, 'id'> {
-  // Slice characters 11-16 from "YYYY-MM-DDTHH:MM:SS" to get "HH:MM"
-  const timeFrom = (iso?: string) => iso ? iso.slice(11, 16) : '00:00'
+  // Slice characters 11-16 from "YYYY-MM-DDTHH:MM:SS" to get "HH:MM".
+  // Date-only values ("YYYY-MM-DD", from all-day events) yield '' here.
+  const timeFrom = (iso?: string) => (iso ? iso.slice(11, 16) : '')
+  // Start times fall back to '00:00' (the "no time" placeholder used for
+  // timeline sorting); end times stay undefined when the event has none.
+  const startTime = timeFrom(event.dtStart) || '00:00'
+  const endTime = timeFrom(event.dtEnd) || undefined
 
   if (event.type === 'flight') {
     return {
@@ -44,8 +49,8 @@ function eventToActivity(event: ICSEvent): Omit<Activity, 'id'> {
       title: event.flightNumber
         ? `${event.airline ?? ''} ${event.flightNumber}`.trim()
         : event.summary,
-      startTime: timeFrom(event.dtStart),
-      endTime: timeFrom(event.dtEnd) || undefined,
+      startTime,
+      endTime,
       notes: event.description,
     }
   }
@@ -53,16 +58,16 @@ function eventToActivity(event: ICSEvent): Omit<Activity, 'id'> {
     return {
       type: 'lodging',
       title: event.summary,
-      startTime: timeFrom(event.dtStart),
-      endTime: timeFrom(event.dtEnd) || undefined,
+      startTime,
+      endTime,
       notes: event.location ?? event.description,
     }
   }
   return {
     type: 'activity',
     title: event.summary,
-    startTime: timeFrom(event.dtStart),
-    endTime: timeFrom(event.dtEnd) || undefined,
+    startTime,
+    endTime,
     notes: [event.location, event.description].filter(Boolean).join(' — ') || undefined,
   }
 }
@@ -171,39 +176,48 @@ export default function CalendarImportModal({ open, onClose }: CalendarImportMod
    */
   async function handleImport() {
     if (!tripMeta || !events.length) return
+    setError('')
     setStep('importing')
 
-    // Fetch the destination image (Unsplash or curated fallback) before building the trip
-    const imageData = await fetchDestinationImage(tripMeta.destination)
-    // Generate empty DayPlan slots for the full trip date range
-    const days = generateDayPlans(tripMeta.startDate, tripMeta.endDate)
+    try {
+      // Fetch the destination image (Unsplash or curated fallback) before building the trip
+      const imageData = await fetchDestinationImage(tripMeta.destination)
+      // Generate empty DayPlan slots for the full trip date range
+      const days = generateDayPlans(tripMeta.startDate, tripMeta.endDate)
 
-    // Place each selected event into the correct day based on its DTSTART date
-    const selectedEvents = events.filter((e) => selected.has(e.uid))
-    for (const event of selectedEvents) {
-      // Slice YYYY-MM-DD from the ISO datetime string to match DayPlan.date format
-      const eventDate = event.dtStart?.slice(0, 10)
-      if (!eventDate) continue
-      const day = days.find((d) => d.date === eventDate)
-      // Events whose date falls outside the trip range are silently dropped
-      if (!day) continue
-      day.activities.push({ ...eventToActivity(event), id: generateId() })
+      // Place each selected event into the correct day based on its DTSTART date
+      const selectedEvents = events.filter((e) => selected.has(e.uid))
+      for (const event of selectedEvents) {
+        // Slice YYYY-MM-DD from the ISO datetime string to match DayPlan.date format
+        const eventDate = event.dtStart?.slice(0, 10)
+        if (!eventDate) continue
+        const day = days.find((d) => d.date === eventDate)
+        // Events whose date falls outside the trip range are silently dropped
+        if (!day) continue
+        day.activities.push({ ...eventToActivity(event), id: generateId() })
+      }
+
+      const id = addTripFull({
+        destination: tripMeta.destination,
+        startDate: tripMeta.startDate,
+        endDate: tripMeta.endDate,
+        days,
+        coverImage: imageData.url,
+        coverImageThumb: imageData.thumb,
+        coverImageAttribution: imageData.attribution,
+        lat: imageData.lat,
+        lon: imageData.lon,
+      })
+
+      setImportedTripId(id)
+      setStep('done')
+    } catch (err) {
+      // Never leave the user stuck on the importing spinner -- surface the
+      // failure and return to the preview step so they can retry
+      console.error('Calendar import failed', err)
+      setError('Something went wrong while importing. Please try again.')
+      setStep('preview')
     }
-
-    const id = addTripFull({
-      destination: tripMeta.destination,
-      startDate: tripMeta.startDate,
-      endDate: tripMeta.endDate,
-      days,
-      coverImage: imageData.url,
-      coverImageThumb: imageData.thumb,
-      coverImageAttribution: imageData.attribution,
-      lat: imageData.lat,
-      lon: imageData.lon,
-    })
-
-    setImportedTripId(id)
-    setStep('done')
   }
 
   /**
@@ -278,7 +292,7 @@ export default function CalendarImportModal({ open, onClose }: CalendarImportMod
         {/* ── Step: Preview ── */}
         {step === 'preview' && tripMeta && (
           <div className="px-6 pb-6 space-y-4">
-            <div className="p-3 rounded-2xl bg-white/5 border border-white/8">
+            <div className="p-3 rounded-2xl bg-white/5 border border-white/[0.08]">
               <p className="text-white/40 text-xs uppercase tracking-widest mb-1">Detected Trip</p>
               <p className="text-white font-semibold">{tripMeta.destination}</p>
               <p className="text-white/50 text-xs mt-0.5">
@@ -298,7 +312,7 @@ export default function CalendarImportModal({ open, onClose }: CalendarImportMod
                     className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
                       selected.has(event.uid)
                         ? 'bg-brand-600/15 border-brand-500/30 text-white'
-                        : 'bg-white/3 border-white/8 text-white/40'
+                        : 'bg-white/[0.03] border-white/[0.08] text-white/40'
                     }`}
                   >
                     <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
@@ -321,8 +335,15 @@ export default function CalendarImportModal({ open, onClose }: CalendarImportMod
               </div>
             </div>
 
+            {error && (
+              <div className="flex items-start gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                {error}
+              </div>
+            )}
+
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setStep('upload')} className="flex-1 border-white/15 text-white/70 bg-transparent hover:bg-white/5">
+              <Button variant="outline" onClick={() => { setError(''); setStep('upload') }} className="flex-1 border-white/15 text-white/70 bg-transparent hover:bg-white/5">
                 Back
               </Button>
               <Button onClick={handleImport} disabled={selected.size === 0} className="flex-1">

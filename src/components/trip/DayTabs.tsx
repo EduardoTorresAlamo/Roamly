@@ -45,7 +45,7 @@ export default function DayTabs({ days, selectedDayId, onSelect }: DayTabsProps)
               'flex-none h-11 px-4 rounded-2xl text-sm font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.95] border',
               isActive
                 ? 'bg-accent text-white border-accent/50 shadow-md'
-                : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/80 border-white/8',
+                : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/80 border-white/[0.08]',
             )}
           >
             <span className="font-semibold">{getDayLabel(index)}</span>

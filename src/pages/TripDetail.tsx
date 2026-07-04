@@ -105,7 +105,7 @@ export default function TripDetail() {
           Map mode    : expands to full height, no cover image (map shows through)
       */}
       <div
-        className="relative flex-shrink-0 transition-[height,min-height,max-height] duration-400 ease-out"
+        className="relative flex-shrink-0 transition-[height,min-height,max-height] duration-[400ms] ease-out"
         style={
           mapExpanded
             ? { height: '100%', minHeight: 0, maxHeight: 'none' }
@@ -143,7 +143,7 @@ export default function TripDetail() {
         {/* Map mode: show activity count pill so user knows markers are on the map */}
         {mapExpanded && (
           <div className="absolute bottom-[calc(48vh+12px)] left-1/2 -translate-x-1/2 flex items-center gap-2 glass-panel rounded-full px-3 py-1.5 pointer-events-none">
-            <Map className="w-3.5 h-3.5 text-accent-DEFAULT" />
+            <Map className="w-3.5 h-3.5 text-accent" />
             <span className="text-xs text-white/70 font-medium">
               {selectedDay?.activities.filter(a => a.lat).length ?? 0} locations on map
             </span>
@@ -182,8 +182,8 @@ export default function TripDetail() {
             className={cn(
               'flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all',
               mapExpanded
-                ? 'bg-accent/20 border-accent/40 text-accent-DEFAULT'
-                : 'border-white/12 text-white/40 hover:text-white hover:border-white/25',
+                ? 'bg-accent/20 border-accent/40 text-accent'
+                : 'border-white/[0.12] text-white/40 hover:text-white hover:border-white/25',
             )}
           >
             {mapExpanded

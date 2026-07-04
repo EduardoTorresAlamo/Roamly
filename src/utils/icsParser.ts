@@ -27,8 +27,6 @@ export interface ICSEvent {
   // Extracted flight fields
   airline?: string
   flightNumber?: string
-  departureAirport?: string
-  arrivalAirport?: string
 }
 
 /**
