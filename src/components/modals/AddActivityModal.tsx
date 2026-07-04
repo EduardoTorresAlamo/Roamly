@@ -282,7 +282,7 @@ export default function AddActivityModal({ open, onClose, onAdd, tripDestination
             {selectedType && !isGeocoding && (
               <button
                 onClick={() => setSelectedType(null)}
-                className="w-8 h-8 rounded-full hover:bg-white/8 flex items-center justify-center text-white/40 hover:text-white transition-colors"
+                className="w-8 h-8 rounded-full hover:bg-white/[0.08] flex items-center justify-center text-white/40 hover:text-white transition-colors"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
@@ -309,7 +309,7 @@ export default function AddActivityModal({ open, onClose, onAdd, tripDestination
                   key={type}
                   onClick={() => setSelectedType(type)}
                   className={cn(
-                    'flex flex-col items-center justify-center gap-2.5 rounded-2xl p-5 min-h-[90px] border border-white/6 transition-all active:scale-[0.95] hover:border-white/15 hover:bg-white/5',
+                    'flex flex-col items-center justify-center gap-2.5 rounded-2xl p-5 min-h-[90px] border border-white/[0.06] transition-all active:scale-[0.95] hover:border-white/15 hover:bg-white/5',
                     m.bg,
                   )}
                 >

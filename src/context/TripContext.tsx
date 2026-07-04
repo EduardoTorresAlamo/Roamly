@@ -80,35 +80,37 @@ export function TripProvider({ children }: { children: ReactNode }) {
         lat: payload.lat,
         lon: payload.lon,
       }
-      setTrips([...trips, newTrip])
+      // Functional update avoids losing trips when multiple mutations land
+      // before React re-renders (e.g. rapid adds or async geocoding callbacks)
+      setTrips((prev) => [...prev, newTrip])
       return id
     },
-    [trips, setTrips],
+    [setTrips],
   )
 
   // Used by calendar import where the day structure is built from ICS events
   const addTripFull = useCallback(
     (trip: Omit<Trip, 'id'>): string => {
       const id = generateId()
-      setTrips([...trips, { ...trip, id }])
+      setTrips((prev) => [...prev, { ...trip, id }])
       return id
     },
-    [trips, setTrips],
+    [setTrips],
   )
 
   const deleteTrip = useCallback(
     (tripId: string) => {
-      setTrips(trips.filter((t) => t.id !== tripId))
+      setTrips((prev) => prev.filter((t) => t.id !== tripId))
     },
-    [trips, setTrips],
+    [setTrips],
   )
 
   const addActivity = useCallback(
     (tripId: string, dayId: string, activity: Omit<Activity, 'id'>) => {
       const newActivity: Activity = { ...activity, id: generateId() }
       // Immutable update: map over trips -> days -> activities; only the target day changes
-      setTrips(
-        trips.map((trip) =>
+      setTrips((prev) =>
+        prev.map((trip) =>
           trip.id !== tripId
             ? trip
             : {
@@ -122,14 +124,14 @@ export function TripProvider({ children }: { children: ReactNode }) {
         ),
       )
     },
-    [trips, setTrips],
+    [setTrips],
   )
 
   const deleteActivity = useCallback(
     (tripId: string, dayId: string, activityId: string) => {
       // Same immutable traversal pattern as addActivity; only the target activity is removed
-      setTrips(
-        trips.map((trip) =>
+      setTrips((prev) =>
+        prev.map((trip) =>
           trip.id !== tripId
             ? trip
             : {
@@ -143,7 +145,7 @@ export function TripProvider({ children }: { children: ReactNode }) {
         ),
       )
     },
-    [trips, setTrips],
+    [setTrips],
   )
 
   const getTripById = useCallback(

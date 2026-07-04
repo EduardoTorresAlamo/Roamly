@@ -55,14 +55,11 @@ export default function NearbyPanel() {
   if (!focusedMarkerId) return null
 
   const focused = markers.find((m) => m.id === focusedMarkerId)
-  const visible = isLoadingRecs || recommendations.length > 0
-
-  if (!visible) return null
 
   return (
     <div className="fixed right-4 top-16 z-40 w-72 glass-panel rounded-2xl overflow-hidden animate-in fade-in slide-in-from-right-4 duration-200">
       {/* Header */}
-      <div className="flex items-start justify-between px-4 py-3 border-b border-white/8">
+      <div className="flex items-start justify-between px-4 py-3 border-b border-white/[0.08]">
         <div className="flex-1 min-w-0 pr-2">
           <p className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-0.5">Nearby</p>
           <p className="text-sm font-semibold text-white leading-tight truncate">
@@ -71,7 +68,7 @@ export default function NearbyPanel() {
         </div>
         <button
           onClick={clearFocus}
-          className="w-7 h-7 flex-shrink-0 rounded-full flex items-center justify-center text-white/40 hover:text-white hover:bg-white/8 transition-colors"
+          className="w-7 h-7 flex-shrink-0 rounded-full flex items-center justify-center text-white/40 hover:text-white hover:bg-white/[0.08] transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
@@ -96,10 +93,10 @@ export default function NearbyPanel() {
         {!isLoadingRecs && recommendations.map((poi) => (
           <div
             key={poi.id}
-            className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors border-b border-white/4 last:border-0"
+            className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors border-b border-white/[0.04] last:border-0"
           >
             {/* Category icon */}
-            <div className="w-7 h-7 rounded-lg bg-white/8 flex items-center justify-center text-white/60 flex-shrink-0">
+            <div className="w-7 h-7 rounded-lg bg-white/[0.08] flex items-center justify-center text-white/60 flex-shrink-0">
               {categoryIcon(poi.category)}
             </div>
 

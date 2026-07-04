@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, useRef, type ReactNode } from 'react'
 import type { ActivityType } from '@/types'
 import { fetchNearbyPOIs, type POI } from '@/utils/overpass'
 
@@ -77,6 +77,10 @@ export function MapProvider({ children }: { children: ReactNode }) {
   const [flyToTarget, setFlyToTarget] = useState<FlyToTarget | null>(null)
   const [mapExpanded, setMapExpanded] = useState(false)
 
+  // Monotonic id for POI fetches. Focusing marker B while marker A's fetch is
+  // still in flight must not let A's late response overwrite B's results.
+  const poiRequestIdRef = useRef(0)
+
   // Wrapped in useCallback to keep the reference stable and avoid re-rendering
   // ActivityMarkers every time unrelated context state changes
   const setMarkers = useCallback((m: MapMarker[]) => {
@@ -91,14 +95,19 @@ export function MapProvider({ children }: { children: ReactNode }) {
     setMapExpanded(true)
     setIsLoadingRecs(true)
     setRecommendations([])
-    // Fetch POIs from Overpass API; update state when the promise resolves
+    // Fetch POIs from Overpass API; update state when the promise resolves.
+    // Ignore the response if another focus/clear happened in the meantime.
+    const requestId = ++poiRequestIdRef.current
     fetchNearbyPOIs(lat, lon).then((pois) => {
+      if (poiRequestIdRef.current !== requestId) return
       setRecommendations(pois)
       setIsLoadingRecs(false)
     })
   }, [])
 
   const clearFocus = useCallback(() => {
+    // Invalidate any in-flight POI fetch so it cannot repopulate the panel
+    poiRequestIdRef.current++
     setFocusedMarkerId(null)
     setRecommendations([])
     setIsLoadingRecs(false)
