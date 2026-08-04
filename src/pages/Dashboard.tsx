@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Calendar, Upload, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, Calendar, Upload, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { useTrips } from '@/hooks/useTrips'
 import { useMapContext } from '@/context/MapContext'
 import TripGrid from '@/components/dashboard/TripGrid'
@@ -124,6 +124,13 @@ export default function Dashboard() {
   const { mapExpanded } = useMapContext()
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [importModalOpen, setImportModalOpen] = useState(false)
+  // Case-insensitive destination search over the trip list
+  const [search, setSearch] = useState('')
+
+  const query = search.trim().toLowerCase()
+  const filteredTrips = query
+    ? trips.filter((t) => t.destination.toLowerCase().includes(query))
+    : trips
 
   const today = new Date()
   const dateStr = formatDate(today.toISOString().slice(0, 10))
@@ -180,9 +187,28 @@ export default function Dashboard() {
             </button>
           </div>
 
+          {/* Search / filter */}
+          <div className="px-5 pb-3 flex-shrink-0">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search trips by destination"
+                className="w-full glass-inner rounded-xl pl-9 pr-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-accent/40"
+              />
+            </div>
+            {query && (
+              <p className="text-white/35 text-xs mt-2">
+                {filteredTrips.length} {filteredTrips.length === 1 ? 'trip' : 'trips'} found
+              </p>
+            )}
+          </div>
+
           {/* Trip list */}
           <div className="flex-1 overflow-y-auto scrollbar-thin px-5 pb-5">
-            <TripGrid trips={trips} onDeleteTrip={deleteTrip} />
+            <TripGrid trips={filteredTrips} onDeleteTrip={deleteTrip} />
           </div>
         </div>
       </div>

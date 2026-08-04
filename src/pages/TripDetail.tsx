@@ -1,14 +1,57 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Plus, ChevronLeft, CalendarDays, Map, ChevronUp } from 'lucide-react'
+import { Plus, ChevronLeft, CalendarDays, Map, ChevronUp, Download, Check } from 'lucide-react'
 import { useTrips } from '@/hooks/useTrips'
-import { formatDateRange, getTripDurationDays } from '@/utils/dates'
+import { formatDate, formatDateRange, getTripDurationDays } from '@/utils/dates'
+import { ACTIVITY_META } from '@/utils/activityIcons'
 import { useMapContext } from '@/context/MapContext'
 import DayTabs from '@/components/trip/DayTabs'
 import ActivityTimeline from '@/components/trip/ActivityTimeline'
 import AddActivityModal from '@/components/modals/AddActivityModal'
-import type { Activity } from '@/types'
+import type { Activity, Trip } from '@/types'
 import { cn } from '@/lib/utils'
+
+/**
+ * Serializes an entire trip into a human-readable markdown itinerary.
+ *
+ * Produces a top-level heading with the destination, a summary line with the
+ * date range and duration, then a section per day listing each activity with its
+ * time, title, type, and notes. Activities are ordered chronologically by start time.
+ *
+ * @param trip - The trip to serialize
+ * @returns A markdown string representing the full itinerary
+ */
+function generateItineraryMarkdown(trip: Trip): string {
+  const duration = getTripDurationDays(trip.startDate, trip.endDate)
+  const lines: string[] = [
+    `# ${trip.destination}`,
+    '',
+    `${formatDateRange(trip.startDate, trip.endDate)} · ${duration} ${duration === 1 ? 'day' : 'days'}`,
+    '',
+  ]
+
+  trip.days.forEach((day, i) => {
+    lines.push(`## Day ${i + 1} — ${formatDate(day.date)}`, '')
+
+    if (day.activities.length === 0) {
+      lines.push('_No activities planned._', '')
+      return
+    }
+
+    // Chronological order by HH:mm start time (lexicographic matches chronological)
+    const sorted = [...day.activities].sort((a, b) => a.startTime.localeCompare(b.startTime))
+    sorted.forEach((activity) => {
+      const label = ACTIVITY_META[activity.type].label
+      const time =
+        activity.startTime && activity.startTime !== '00:00' ? `${activity.startTime} · ` : ''
+      lines.push(`- **${time}${activity.title}** _(${label})_`)
+      if (activity.notes) lines.push(`  ${activity.notes}`)
+    })
+    lines.push('')
+  })
+
+  return lines.join('\n')
+}
 
 /**
  * Trip detail page displaying the day-by-day itinerary and the interactive map.
@@ -26,13 +69,22 @@ import { cn } from '@/lib/utils'
  */
 export default function TripDetail() {
   const { tripId } = useParams<{ tripId: string }>()
-  const { getTripById, addActivity, deleteActivity } = useTrips()
+  const { getTripById, addActivity, deleteActivity, moveActivity } = useTrips()
   const { setMarkers, flyTo, clearFocus, mapExpanded, setMapExpanded } = useMapContext()
   const trip = getTripById(tripId ?? '')
 
   // Default to day 1 on initial render; lazy initializer avoids an extra render cycle
   const [selectedDayId, setSelectedDayId] = useState<string>(() => trip?.days[0]?.id ?? '')
   const [addModalOpen, setAddModalOpen] = useState(false)
+  // Brief confirmation shown after the itinerary is copied to the clipboard
+  const [copied, setCopied] = useState(false)
+
+  // Auto-dismiss the "Itinerary copied!" toast after 2 seconds
+  useEffect(() => {
+    if (!copied) return
+    const timer = setTimeout(() => setCopied(false), 2000)
+    return () => clearTimeout(timer)
+  }, [copied])
 
   // Center the map on this trip's destination whenever the tripId route param changes.
   // clearFocus() dismisses any NearbyPanel left over from a previously viewed trip.
@@ -95,6 +147,28 @@ export default function TripDetail() {
   function handleDeleteActivity(activityId: string) {
     if (!selectedDay) return
     deleteActivity(trip!.id, selectedDay.id, activityId)
+  }
+
+  /**
+   * Reorders an activity within the currently selected day via drag-and-drop.
+   */
+  function handleMoveActivity(fromIndex: number, toIndex: number) {
+    if (!selectedDay) return
+    moveActivity(trip!.id, selectedDay.id, fromIndex, toIndex)
+  }
+
+  /**
+   * Serializes the trip to markdown, copies it to the clipboard, and shows a
+   * brief confirmation toast.
+   */
+  async function handleExport() {
+    try {
+      await navigator.clipboard.writeText(generateItineraryMarkdown(trip!))
+      setCopied(true)
+    } catch {
+      // Clipboard access can fail (e.g. denied permission or insecure context);
+      // fail silently rather than crashing the page.
+    }
   }
 
   return (
@@ -176,21 +250,40 @@ export default function TripDetail() {
             </div>
           </div>
 
-          {/* Map toggle button */}
-          <button
-            onClick={() => setMapExpanded(!mapExpanded)}
-            className={cn(
-              'flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all',
-              mapExpanded
-                ? 'bg-accent/20 border-accent/40 text-accent'
-                : 'border-white/[0.12] text-white/40 hover:text-white hover:border-white/25',
-            )}
-          >
-            {mapExpanded
-              ? <><ChevronUp className="w-3.5 h-3.5" /><span>Collapse</span></>
-              : <><Map className="w-3.5 h-3.5" /><span>Map</span></>
-            }
-          </button>
+          {/* Header actions */}
+          <div className="flex-shrink-0 flex items-center gap-2">
+            {/* Export itinerary as markdown */}
+            <button
+              onClick={handleExport}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all',
+                copied
+                  ? 'bg-accent/20 border-accent/40 text-accent'
+                  : 'border-white/[0.12] text-white/40 hover:text-white hover:border-white/25',
+              )}
+            >
+              {copied
+                ? <><Check className="w-3.5 h-3.5" /><span>Copied</span></>
+                : <><Download className="w-3.5 h-3.5" /><span>Export</span></>
+              }
+            </button>
+
+            {/* Map toggle button */}
+            <button
+              onClick={() => setMapExpanded(!mapExpanded)}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all',
+                mapExpanded
+                  ? 'bg-accent/20 border-accent/40 text-accent'
+                  : 'border-white/[0.12] text-white/40 hover:text-white hover:border-white/25',
+              )}
+            >
+              {mapExpanded
+                ? <><ChevronUp className="w-3.5 h-3.5" /><span>Collapse</span></>
+                : <><Map className="w-3.5 h-3.5" /><span>Map</span></>
+              }
+            </button>
+          </div>
         </div>
 
         {/* Day tabs */}
@@ -208,6 +301,7 @@ export default function TripDetail() {
             <ActivityTimeline
               day={selectedDay}
               onDeleteActivity={handleDeleteActivity}
+              onMoveActivity={handleMoveActivity}
             />
           )}
         </div>
@@ -222,6 +316,19 @@ export default function TripDetail() {
       >
         <Plus className="w-7 h-7 stroke-[2.5]" />
       </button>
+
+      {/* ── "Itinerary copied!" toast ── */}
+      <div
+        className={cn(
+          'fixed top-6 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 glass-panel rounded-full px-4 py-2 text-sm font-medium text-white transition-all duration-300',
+          copied ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 pointer-events-none',
+        )}
+        role="status"
+        aria-live="polite"
+      >
+        <Check className="w-4 h-4 text-accent" />
+        Itinerary copied!
+      </div>
 
       <AddActivityModal
         open={addModalOpen}

@@ -46,6 +46,11 @@ interface TripContextValue {
   addActivity: (tripId: string, dayId: string, activity: Omit<Activity, 'id'>) => void
   /** Removes a single activity from the specified day */
   deleteActivity: (tripId: string, dayId: string, activityId: string) => void
+  /**
+   * Reorders an activity within a day by moving it from one array index to another.
+   * Used by the timeline's native drag-and-drop reordering.
+   */
+  moveActivity: (tripId: string, dayId: string, fromIndex: number, toIndex: number) => void
   /** Returns the Trip with the given id, or undefined if not found */
   getTripById: (tripId: string) => Trip | undefined
 }
@@ -148,13 +153,46 @@ export function TripProvider({ children }: { children: ReactNode }) {
     [setTrips],
   )
 
+  const moveActivity = useCallback(
+    (tripId: string, dayId: string, fromIndex: number, toIndex: number) => {
+      setTrips((prev) =>
+        prev.map((trip) =>
+          trip.id !== tripId
+            ? trip
+            : {
+                ...trip,
+                days: trip.days.map((day) => {
+                  if (day.id !== dayId) return day
+                  const activities = [...day.activities]
+                  // Guard against stale/out-of-range indices and no-op moves
+                  if (
+                    fromIndex < 0 ||
+                    fromIndex >= activities.length ||
+                    toIndex < 0 ||
+                    toIndex >= activities.length ||
+                    fromIndex === toIndex
+                  ) {
+                    return day
+                  }
+                  // Remove the dragged activity, then re-insert it at the drop index
+                  const [moved] = activities.splice(fromIndex, 1)
+                  activities.splice(toIndex, 0, moved)
+                  return { ...day, activities }
+                }),
+              },
+        ),
+      )
+    },
+    [setTrips],
+  )
+
   const getTripById = useCallback(
     (tripId: string) => trips.find((t) => t.id === tripId),
     [trips],
   )
 
   return (
-    <TripContext.Provider value={{ trips, addTrip, addTripFull, deleteTrip, addActivity, deleteActivity, getTripById }}>
+    <TripContext.Provider value={{ trips, addTrip, addTripFull, deleteTrip, addActivity, deleteActivity, moveActivity, getTripById }}>
       {children}
     </TripContext.Provider>
   )

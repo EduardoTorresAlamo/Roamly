@@ -1,13 +1,27 @@
-import { Trash2, MapPin } from 'lucide-react'
+import { Trash2, MapPin, GripVertical } from 'lucide-react'
 import type { Activity } from '@/types'
 import { ACTIVITY_META } from '@/utils/activityIcons'
 import { cn } from '@/lib/utils'
 
 interface ActivityItemProps {
   activity: Activity
+  /** Position of this activity within the day's activities array (drag source/target index) */
+  index: number
   onDelete: () => void
   /** Called when the user taps the map pin button; only passed if the activity has coordinates */
   onFocus?: () => void
+  /** Fired when a drag begins on this row, with its index */
+  onDragStart?: (index: number) => void
+  /** Fired as another dragged row enters this one, with this row's index */
+  onDragEnter?: (index: number) => void
+  /** Fired when a dragged row is dropped onto this one, with this row's index */
+  onDrop?: (index: number) => void
+  /** Fired when the drag gesture ends (dropped anywhere or cancelled) */
+  onDragEnd?: () => void
+  /** True while this row is the one being dragged (dimmed for feedback) */
+  isDragging?: boolean
+  /** True while a dragged row is hovering over this one (shows drop indicator) */
+  isDragOver?: boolean
 }
 
 /**
@@ -36,10 +50,22 @@ function formatTime(time: string): string {
  * geocoded (has lat/lon), keeping the UI clean for un-geocoded activities like flights.
  *
  * @param activity - The activity to render
+ * @param index - The activity's index within the day, used for drag reordering
  * @param onDelete - Callback to remove this activity from the day
  * @param onFocus - Optional callback to focus the activity marker on the map
  */
-export default function ActivityItem({ activity, onDelete, onFocus }: ActivityItemProps) {
+export default function ActivityItem({
+  activity,
+  index,
+  onDelete,
+  onFocus,
+  onDragStart,
+  onDragEnter,
+  onDrop,
+  onDragEnd,
+  isDragging,
+  isDragOver,
+}: ActivityItemProps) {
   const meta = ACTIVITY_META[activity.type]
   const Icon = meta.icon
 
@@ -48,7 +74,36 @@ export default function ActivityItem({ activity, onDelete, onFocus }: ActivityIt
   const hasCoords = activity.lat != null && activity.lon != null
 
   return (
-    <div className="group flex gap-3 items-start">
+    <div
+      className={cn(
+        'group relative flex gap-3 items-start transition-opacity',
+        isDragging && 'opacity-40',
+      )}
+      draggable
+      onDragStart={() => onDragStart?.(index)}
+      onDragEnter={() => onDragEnter?.(index)}
+      // preventDefault on dragover is required for the drop event to fire
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => {
+        e.preventDefault()
+        onDrop?.(index)
+      }}
+      onDragEnd={() => onDragEnd?.()}
+    >
+      {/* Drop indicator — a bar above the row the dragged item would land on */}
+      {isDragOver && !isDragging && (
+        <div className="absolute -top-1.5 left-0 right-0 h-0.5 rounded-full bg-accent z-20" />
+      )}
+
+      {/* Drag handle — sits in the timeline's left padding, revealed on hover */}
+      <div
+        className="absolute -left-3 top-4 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing text-white/30 hover:text-white/60"
+        aria-label="Drag to reorder"
+        title="Drag to reorder"
+      >
+        <GripVertical className="w-4 h-4" />
+      </div>
+
       {/* Icon circle */}
       <div className={cn('w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 mt-0.5 border border-white/[0.08]', meta.bg)}>
         <Icon className={cn('w-5 h-5', meta.color)} />

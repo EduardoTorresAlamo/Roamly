@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Sparkles } from 'lucide-react'
 import type { DayPlan } from '@/types'
 import ActivityItem from './ActivityItem'
@@ -6,25 +7,45 @@ import { useMapContext } from '@/context/MapContext'
 interface ActivityTimelineProps {
   day: DayPlan
   onDeleteActivity: (activityId: string) => void
+  /** Reorders an activity within this day from one index to another (drag-and-drop) */
+  onMoveActivity: (fromIndex: number, toIndex: number) => void
 }
 
 /**
- * Renders all activities for a single day as a vertical timeline.
+ * Renders all activities for a single day as a vertical, drag-reorderable timeline.
  *
- * Activities are sorted by startTime (HH:mm string comparison works correctly for
- * ISO-format time strings) so they appear in chronological order regardless of the
- * order they were added. The visual timeline line is an absolutely positioned
- * 1px vertical bar aligned to the left icon column.
+ * Activities render in their stored array order so manual drag-and-drop reordering is
+ * reflected immediately. Native HTML5 drag events track the dragged and hovered rows;
+ * on drop, onMoveActivity is invoked to persist the new order in TripContext. The
+ * visual timeline line is an absolutely positioned 1px vertical bar aligned to the
+ * left icon column.
  *
  * @param day - The DayPlan whose activities should be displayed
  * @param onDeleteActivity - Callback invoked with an activity id when its delete button is pressed
+ * @param onMoveActivity - Callback invoked with (fromIndex, toIndex) when a row is dropped
  */
-export default function ActivityTimeline({ day, onDeleteActivity }: ActivityTimelineProps) {
+export default function ActivityTimeline({ day, onDeleteActivity, onMoveActivity }: ActivityTimelineProps) {
   const { focusMarker } = useMapContext()
-  // Sort by startTime string -- HH:mm lexicographic order matches chronological order
-  const sorted = [...day.activities].sort((a, b) => a.startTime.localeCompare(b.startTime))
+  // Index of the row currently being dragged, or null when no drag is in progress
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
+  // Index of the row currently hovered as a drop target (drives the drop indicator)
+  const [overIndex, setOverIndex] = useState<number | null>(null)
 
-  if (sorted.length === 0) {
+  /** Resets drag state once a drag gesture completes or is cancelled */
+  function resetDrag() {
+    setDragIndex(null)
+    setOverIndex(null)
+  }
+
+  /** Persists the reorder when a row is dropped onto another */
+  function handleDrop(toIndex: number) {
+    if (dragIndex !== null && dragIndex !== toIndex) {
+      onMoveActivity(dragIndex, toIndex)
+    }
+    resetDrag()
+  }
+
+  if (day.activities.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-14 text-center">
         <div className="w-14 h-14 rounded-full bg-white/5 border border-white/[0.08] flex items-center justify-center mb-3">
@@ -41,11 +62,18 @@ export default function ActivityTimeline({ day, onDeleteActivity }: ActivityTime
       {/* Decorative vertical line connecting activity items in the timeline */}
       <div className="absolute left-5 top-5 bottom-5 w-px bg-white/[0.08] z-0" />
       <div className="relative z-10 space-y-3">
-        {sorted.map((activity) => (
+        {day.activities.map((activity, index) => (
           <ActivityItem
             key={activity.id}
             activity={activity}
+            index={index}
             onDelete={() => onDeleteActivity(activity.id)}
+            onDragStart={setDragIndex}
+            onDragEnter={setOverIndex}
+            onDrop={handleDrop}
+            onDragEnd={resetDrag}
+            isDragging={dragIndex === index}
+            isDragOver={overIndex === index}
             // Only pass onFocus when the activity has been geocoded;
             // omitting it hides the map-pin button for un-geocoded entries
             onFocus={
