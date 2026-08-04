@@ -26,3 +26,13 @@ dist-ssr
 .claude-flow/
 CLAUDE.md
 pending-insights.jsonl
+node_modules
+dist
+dist-ssr
+*.local
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+.claude/
