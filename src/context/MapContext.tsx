@@ -143,6 +143,7 @@ export function MapProvider({ children }: { children: ReactNode }) {
  *
  * @throws If called outside of a MapProvider component tree
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useMapContext() {
   const ctx = useContext(MapContext)
   if (!ctx) throw new Error('useMapContext must be used inside MapProvider')

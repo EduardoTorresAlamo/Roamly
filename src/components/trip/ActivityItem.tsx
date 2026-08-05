@@ -73,12 +73,55 @@ export default function ActivityItem({
   const endFormatted = activity.endTime ? formatTime(activity.endTime) : ''
   const hasCoords = activity.lat != null && activity.lon != null
 
+  // ── Touch drag support ──
+  // The HTML5 drag-and-drop API (draggable / dragstart / drop) is not implemented
+  // by iOS Safari or Android Chrome, so on touch devices reordering is driven by
+  // raw touch events on the grip handle instead. Rows are located by hit-testing
+  // the touch point against the data-activity-index attribute below.
+
+  /**
+   * Resolves the activity row underneath a viewport coordinate.
+   *
+   * @param x - Client X coordinate of the touch point
+   * @param y - Client Y coordinate of the touch point
+   * @returns The row's index, or null if the point is not over a row
+   */
+  function indexFromPoint(x: number, y: number): number | null {
+    const row = document.elementFromPoint(x, y)?.closest('[data-activity-index]')
+    if (!row) return null
+    const parsed = Number(row.getAttribute('data-activity-index'))
+    return Number.isNaN(parsed) ? null : parsed
+  }
+
+  /** Begins a touch drag from this row's handle */
+  function handleTouchStart() {
+    onDragStart?.(index)
+  }
+
+  /** Tracks which row the finger is currently over so the drop indicator follows it */
+  function handleTouchMove(e: React.TouchEvent) {
+    const touch = e.touches[0]
+    if (!touch) return
+    const target = indexFromPoint(touch.clientX, touch.clientY)
+    if (target !== null) onDragEnter?.(target)
+  }
+
+  /** Drops onto whichever row the finger was released over, or cancels the drag */
+  function handleTouchEnd(e: React.TouchEvent) {
+    const touch = e.changedTouches[0]
+    const target = touch ? indexFromPoint(touch.clientX, touch.clientY) : null
+    if (target !== null) onDrop?.(target)
+    else onDragEnd?.()
+  }
+
   return (
     <div
       className={cn(
         'group relative flex gap-3 items-start transition-opacity',
         isDragging && 'opacity-40',
       )}
+      // Hit-test target for touch reordering (see indexFromPoint above)
+      data-activity-index={index}
       draggable
       onDragStart={() => onDragStart?.(index)}
       onDragEnter={() => onDragEnter?.(index)}
@@ -95,11 +138,20 @@ export default function ActivityItem({
         <div className="absolute -top-1.5 left-0 right-0 h-0.5 rounded-full bg-accent z-20" />
       )}
 
-      {/* Drag handle — sits in the timeline's left padding, revealed on hover */}
+      {/* Drag handle — sits in the timeline's left padding.
+          Always visible on touch screens (there is no hover to reveal it) and
+          revealed on hover from sm: up. `touch-none` suppresses page scrolling
+          for gestures that start here, which is what makes the touch drag work. */}
       <div
-        className="absolute -left-3 top-4 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing text-white/30 hover:text-white/60"
+        className="absolute -left-4 top-2 w-8 h-8 flex items-center justify-center touch-none opacity-50 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing text-white/40 hover:text-white/70"
+        role="button"
+        tabIndex={-1}
         aria-label="Drag to reorder"
         title="Drag to reorder"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={() => onDragEnd?.()}
       >
         <GripVertical className="w-4 h-4" />
       </div>

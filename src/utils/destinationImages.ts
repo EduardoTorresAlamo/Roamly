@@ -1,15 +1,26 @@
 /**
- * Destination image fetching via Unsplash API.
- * Set VITE_UNSPLASH_ACCESS_KEY in .env.local to enable live search.
- * Without a key, falls back to curated Unsplash photo IDs for popular destinations.
+ * Destination image fetching via a server-side Unsplash proxy.
+ *
+ * The Unsplash access key must never reach the browser: anything read from
+ * `import.meta.env.VITE_*` is inlined verbatim into the minified bundle and is
+ * trivially extractable from `dist/assets/*.js`. Instead the key lives only in the
+ * server environment (`UNSPLASH_ACCESS_KEY`), and the client calls the proxy
+ * endpoint shipped in `api/unsplash.ts`.
+ *
+ * Set `VITE_UNSPLASH_PROXY_URL` to enable live search (defaults to disabled so a
+ * purely static deployment makes no doomed requests). See `.env.example`.
  *
  * Coordinates are sourced from:
- *  1. Unsplash photo metadata (when available)
+ *  1. Unsplash photo metadata returned by the proxy (when available)
  *  2. Curated map (hardcoded for 20+ popular destinations)
  *  3. Nominatim geocoding (free, no API key) — runs as fallback for unknown destinations
  */
 
 import { geocodePlace } from './geocoding'
+
+// Path/URL of the server-side proxy, e.g. "/api/unsplash". Empty means "no proxy
+// configured" -- the app then serves curated images only, with no network call.
+const PROXY_URL = (import.meta.env.VITE_UNSPLASH_PROXY_URL as string | undefined)?.trim() ?? ''
 
 /**
  * A resolved destination image with optional coordinates.
@@ -202,45 +213,32 @@ function findCurated(destination: string): UnsplashResult | null {
  * Fetch a destination photo + coordinates.
  *
  * Priority chain:
- *  1. Unsplash API (if VITE_UNSPLASH_ACCESS_KEY is set) — biased toward city/landscape photos
+ *  1. Unsplash via the server-side proxy (if VITE_UNSPLASH_PROXY_URL is set)
  *  2. Curated map (hardcoded for 20+ popular destinations)
  *  3. Nominatim geocoding to get coordinates for the default image
  */
 export async function fetchDestinationImage(destination: string): Promise<UnsplashResult> {
-  const accessKey = import.meta.env.VITE_UNSPLASH_ACCESS_KEY as string | undefined
-
-  if (accessKey) {
+  if (PROXY_URL) {
     try {
-      // "cityscape" or "aerial" biases toward actual city photos vs generic travel stock
-      const query = encodeURIComponent(`${destination} cityscape city`)
-      const res = await fetch(
-        `https://api.unsplash.com/photos/random?query=${query}&orientation=landscape&client_id=${accessKey}`,
-      )
+      const res = await fetch(`${PROXY_URL}?destination=${encodeURIComponent(destination)}`)
       if (res.ok) {
-        const data = await res.json() as {
-          urls: { regular: string; thumb: string }
-          user: { name: string }
-          location?: { position?: { latitude?: number; longitude?: number } }
-        }
-        const result: UnsplashResult = {
-          url: data.urls.regular + '&w=1920&q=85',
-          thumb: data.urls.thumb,
-          attribution: data.user.name,
-          lat: data.location?.position?.latitude ?? undefined,
-          lon: data.location?.position?.longitude ?? undefined,
-        }
-        // If Unsplash didn't supply coordinates, fall back to Nominatim
-        if (!result.lat || !result.lon) {
-          const geo = await geocodePlace(destination)
-          if (geo) {
-            result.lat = geo.lat
-            result.lon = geo.lon
+        // The proxy returns an already-normalized UnsplashResult so the client never
+        // has to know Unsplash's response shape (or hold its credentials).
+        const result = await res.json() as UnsplashResult
+        if (result?.url && result?.thumb) {
+          // If Unsplash didn't supply coordinates, fall back to Nominatim
+          if (!result.lat || !result.lon) {
+            const geo = await geocodePlace(destination)
+            if (geo) {
+              result.lat = geo.lat
+              result.lon = geo.lon
+            }
           }
+          return result
         }
-        return result
       }
     } catch {
-      // Fall through to curated
+      // Proxy unreachable or returned non-JSON — fall through to curated
     }
   }
 

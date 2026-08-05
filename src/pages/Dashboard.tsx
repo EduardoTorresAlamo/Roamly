@@ -5,7 +5,8 @@ import { useMapContext } from '@/context/MapContext'
 import TripGrid from '@/components/dashboard/TripGrid'
 import AddTripModal from '@/components/modals/AddTripModal'
 import CalendarImportModal from '@/components/modals/CalendarImportModal'
-import { formatDate } from '@/utils/dates'
+import ConfirmDialog from '@/components/modals/ConfirmDialog'
+import { formatDate, getTodayISO } from '@/utils/dates'
 
 /**
  * Compact interactive calendar widget showing the current month.
@@ -126,14 +127,26 @@ export default function Dashboard() {
   const [importModalOpen, setImportModalOpen] = useState(false)
   // Case-insensitive destination search over the trip list
   const [search, setSearch] = useState('')
+  // Id of the trip awaiting delete confirmation, or null when no prompt is open
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   const query = search.trim().toLowerCase()
   const filteredTrips = query
     ? trips.filter((t) => t.destination.toLowerCase().includes(query))
     : trips
 
-  const today = new Date()
-  const dateStr = formatDate(today.toISOString().slice(0, 10))
+  const pendingDeleteTrip = trips.find((t) => t.id === pendingDeleteId) ?? null
+
+  const dateStr = formatDate(getTodayISO())
+
+  /**
+   * Deletes the trip the user confirmed and closes the confirmation dialog.
+   * Deletion is permanent -- trips live only in localStorage with no undo history.
+   */
+  function handleConfirmDelete() {
+    if (pendingDeleteId) deleteTrip(pendingDeleteId)
+    setPendingDeleteId(null)
+  }
 
   return (
     <div className="flex h-full w-full overflow-hidden">
@@ -208,7 +221,7 @@ export default function Dashboard() {
 
           {/* Trip list */}
           <div className="flex-1 overflow-y-auto scrollbar-thin px-5 pb-5">
-            <TripGrid trips={filteredTrips} onDeleteTrip={deleteTrip} />
+            <TripGrid trips={filteredTrips} onDeleteTrip={setPendingDeleteId} />
           </div>
         </div>
       </div>
@@ -224,6 +237,19 @@ export default function Dashboard() {
 
       <AddTripModal open={addModalOpen} onClose={() => setAddModalOpen(false)} />
       <CalendarImportModal open={importModalOpen} onClose={() => setImportModalOpen(false)} />
+
+      <ConfirmDialog
+        open={pendingDeleteTrip !== null}
+        title="Delete this trip?"
+        description={
+          pendingDeleteTrip
+            ? `"${pendingDeleteTrip.destination}" and all of its days and activities will be permanently deleted. This cannot be undone.`
+            : ''
+        }
+        confirmLabel="Delete trip"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setPendingDeleteId(null)}
+      />
     </div>
   )
 }

@@ -203,6 +203,7 @@ export function TripProvider({ children }: { children: ReactNode }) {
  *
  * @throws If called outside of a TripProvider component tree
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useTripContext(): TripContextValue {
   const ctx = useContext(TripContext)
   if (!ctx) throw new Error('useTripContext must be used within TripProvider')

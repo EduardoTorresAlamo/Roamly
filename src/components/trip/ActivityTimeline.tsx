@@ -15,10 +15,11 @@ interface ActivityTimelineProps {
  * Renders all activities for a single day as a vertical, drag-reorderable timeline.
  *
  * Activities render in their stored array order so manual drag-and-drop reordering is
- * reflected immediately. Native HTML5 drag events track the dragged and hovered rows;
- * on drop, onMoveActivity is invoked to persist the new order in TripContext. The
- * visual timeline line is an absolutely positioned 1px vertical bar aligned to the
- * left icon column.
+ * reflected immediately. Native HTML5 drag events (desktop) and touch events on the
+ * grip handle (mobile, where HTML5 DnD is unsupported) both feed the same
+ * dragIndex/overIndex state; on drop, onMoveActivity is invoked to persist the new
+ * order in TripContext. The visual timeline line is an absolutely positioned 1px
+ * vertical bar aligned to the left icon column.
  *
  * @param day - The DayPlan whose activities should be displayed
  * @param onDeleteActivity - Callback invoked with an activity id when its delete button is pressed

@@ -8,6 +8,7 @@ import { useMapContext } from '@/context/MapContext'
 import DayTabs from '@/components/trip/DayTabs'
 import ActivityTimeline from '@/components/trip/ActivityTimeline'
 import AddActivityModal from '@/components/modals/AddActivityModal'
+import ConfirmDialog from '@/components/modals/ConfirmDialog'
 import type { Activity, Trip } from '@/types'
 import { cn } from '@/lib/utils'
 
@@ -78,6 +79,8 @@ export default function TripDetail() {
   const [addModalOpen, setAddModalOpen] = useState(false)
   // Brief confirmation shown after the itinerary is copied to the clipboard
   const [copied, setCopied] = useState(false)
+  // Id of the activity awaiting delete confirmation, or null when no prompt is open
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   // Auto-dismiss the "Itinerary copied!" toast after 2 seconds
   useEffect(() => {
@@ -131,6 +134,8 @@ export default function TripDetail() {
   }
 
   const duration = getTripDurationDays(trip.startDate, trip.endDate)
+  // Activity targeted by the confirmation dialog; drives its title/description text
+  const pendingActivity = selectedDay?.activities.find((a) => a.id === pendingDeleteId) ?? null
 
   /**
    * Adds a new activity to the currently selected day.
@@ -142,11 +147,15 @@ export default function TripDetail() {
   }
 
   /**
-   * Removes an activity from the currently selected day by its id.
+   * Removes the confirmed activity from the currently selected day.
+   * Called only after the user accepts the confirmation dialog -- deletion is
+   * permanent, since activities live only in localStorage with no undo history.
    */
-  function handleDeleteActivity(activityId: string) {
-    if (!selectedDay) return
-    deleteActivity(trip!.id, selectedDay.id, activityId)
+  function handleConfirmDeleteActivity() {
+    if (selectedDay && pendingDeleteId) {
+      deleteActivity(trip!.id, selectedDay.id, pendingDeleteId)
+    }
+    setPendingDeleteId(null)
   }
 
   /**
@@ -300,7 +309,7 @@ export default function TripDetail() {
           {selectedDay && (
             <ActivityTimeline
               day={selectedDay}
-              onDeleteActivity={handleDeleteActivity}
+              onDeleteActivity={setPendingDeleteId}
               onMoveActivity={handleMoveActivity}
             />
           )}
@@ -335,6 +344,19 @@ export default function TripDetail() {
         onClose={() => setAddModalOpen(false)}
         onAdd={handleAddActivity}
         tripDestination={trip.destination}
+      />
+
+      <ConfirmDialog
+        open={pendingActivity !== null}
+        title="Delete this activity?"
+        description={
+          pendingActivity
+            ? `"${pendingActivity.title}" will be permanently removed from this day. This cannot be undone.`
+            : ''
+        }
+        confirmLabel="Delete activity"
+        onConfirm={handleConfirmDeleteActivity}
+        onCancel={() => setPendingDeleteId(null)}
       />
     </div>
   )
