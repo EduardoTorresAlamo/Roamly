@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useMap } from 'react-leaflet'
 import L from 'leaflet'
-import { useMapContext } from '@/context/MapContext'
+import { useMapContext } from '@/hooks/useMapContext'
 import type { ActivityType } from '@/types'
 
 // CSS hex colors keyed by activity type; used inside inline SVGs where Tailwind classes cannot be applied

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Plane, Map, X } from 'lucide-react'
 import MapBackground from './MapBackground'
 import { useTrips } from '@/hooks/useTrips'
-import { useMapContext } from '@/context/MapContext'
+import { useMapContext } from '@/hooks/useMapContext'
 import { cn } from '@/lib/utils'
 
 /**

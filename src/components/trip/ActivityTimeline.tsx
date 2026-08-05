@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Sparkles } from 'lucide-react'
 import type { DayPlan } from '@/types'
 import ActivityItem from './ActivityItem'
-import { useMapContext } from '@/context/MapContext'
+import { useMapContext } from '@/hooks/useMapContext'
 
 interface ActivityTimelineProps {
   day: DayPlan

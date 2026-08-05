@@ -5,4 +5,4 @@
  * context module directly, making the import path stable if the context
  * implementation changes.
  */
-export { useTripContext as useTrips } from '@/context/TripContext'
+export { useTripContext as useTrips } from '@/hooks/useTripContext'

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Plus, Calendar, Upload, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { useTrips } from '@/hooks/useTrips'
-import { useMapContext } from '@/context/MapContext'
+import { useMapContext } from '@/hooks/useMapContext'
 import TripGrid from '@/components/dashboard/TripGrid'
 import AddTripModal from '@/components/modals/AddTripModal'
 import CalendarImportModal from '@/components/modals/CalendarImportModal'

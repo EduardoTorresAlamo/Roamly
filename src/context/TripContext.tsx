@@ -1,5 +1,6 @@
-import { createContext, useContext, useCallback, type ReactNode } from 'react'
+import { useCallback, type ReactNode } from 'react'
 import type { Trip, Activity } from '@/types'
+import { TripContext } from '@/hooks/useTripContext'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { generateId } from '@/utils/id'
 import { generateDayPlans } from '@/utils/dates'
@@ -27,7 +28,7 @@ interface AddTripPayload {
  * All mutations update localStorage via useLocalStorage, so no separate
  * persistence step is needed after calling any of these functions.
  */
-interface TripContextValue {
+export interface TripContextValue {
   /** All persisted trips in insertion order */
   trips: Trip[]
   /**
@@ -54,8 +55,6 @@ interface TripContextValue {
   /** Returns the Trip with the given id, or undefined if not found */
   getTripById: (tripId: string) => Trip | undefined
 }
-
-const TripContext = createContext<TripContextValue | null>(null)
 
 /**
  * Provides trip CRUD operations and localStorage persistence to the component tree.
@@ -196,16 +195,4 @@ export function TripProvider({ children }: { children: ReactNode }) {
       {children}
     </TripContext.Provider>
   )
-}
-
-/**
- * Consumes TripContext and returns all trip operations.
- *
- * @throws If called outside of a TripProvider component tree
- */
-// eslint-disable-next-line react-refresh/only-export-components
-export function useTripContext(): TripContextValue {
-  const ctx = useContext(TripContext)
-  if (!ctx) throw new Error('useTripContext must be used within TripProvider')
-  return ctx
 }

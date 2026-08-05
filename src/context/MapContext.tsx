@@ -1,6 +1,7 @@
-import { createContext, useContext, useState, useCallback, useRef, type ReactNode } from 'react'
+import { useState, useCallback, useRef, type ReactNode } from 'react'
 import type { ActivityType } from '@/types'
 import { fetchNearbyPOIs, type POI } from '@/utils/overpass'
+import { MapContext } from '@/hooks/useMapContext'
 
 /**
  * A single activity pin to display on the Leaflet map.
@@ -35,7 +36,7 @@ export interface FlyToTarget {
  * positions derived from trip data and orchestrates flyTo animations and
  * Overpass POI fetching when a marker is focused.
  */
-interface MapContextValue {
+export interface MapContextValue {
   /** Current set of activity pins derived from the selected day's activities */
   markers: MapMarker[]
   /** Id of the marker that is currently highlighted, or null */
@@ -58,8 +59,6 @@ interface MapContextValue {
   /** Animate the map to arbitrary coordinates, e.g. the trip destination on page load */
   flyTo: (lat: number, lon: number, zoom?: number) => void
 }
-
-const MapContext = createContext<MapContextValue | null>(null)
 
 /**
  * Provides map state and actions to the component tree.
@@ -136,16 +135,4 @@ export function MapProvider({ children }: { children: ReactNode }) {
       {children}
     </MapContext.Provider>
   )
-}
-
-/**
- * Consumes MapContext and returns map state and actions.
- *
- * @throws If called outside of a MapProvider component tree
- */
-// eslint-disable-next-line react-refresh/only-export-components
-export function useMapContext() {
-  const ctx = useContext(MapContext)
-  if (!ctx) throw new Error('useMapContext must be used inside MapProvider')
-  return ctx
 }

@@ -4,7 +4,7 @@ import { Plus, ChevronLeft, CalendarDays, Map, ChevronUp, Download, Check } from
 import { useTrips } from '@/hooks/useTrips'
 import { formatDate, formatDateRange, getTripDurationDays } from '@/utils/dates'
 import { ACTIVITY_META } from '@/utils/activityIcons'
-import { useMapContext } from '@/context/MapContext'
+import { useMapContext } from '@/hooks/useMapContext'
 import DayTabs from '@/components/trip/DayTabs'
 import ActivityTimeline from '@/components/trip/ActivityTimeline'
 import AddActivityModal from '@/components/modals/AddActivityModal'

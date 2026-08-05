@@ -1,5 +1,5 @@
 import { X, Utensils, Coffee, Beer, Landmark, BedDouble, TreePine, Star, MapPin, Loader2 } from 'lucide-react'
-import { useMapContext } from '@/context/MapContext'
+import { useMapContext } from '@/hooks/useMapContext'
 import type { POI } from '@/utils/overpass'
 
 /**

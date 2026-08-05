@@ -2,7 +2,7 @@ import { type ReactNode } from 'react'
 import { MapContainer, TileLayer } from 'react-leaflet'
 import ActivityMarkers from '@/components/map/ActivityMarkers'
 import NearbyPanel from '@/components/map/NearbyPanel'
-import { useMapContext } from '@/context/MapContext'
+import { useMapContext } from '@/hooks/useMapContext'
 
 /**
  * Props accepted by the MapBackground layout component.
