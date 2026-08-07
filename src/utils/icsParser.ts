@@ -194,6 +194,22 @@ function extractFlightInfo(summary: string): { airline?: string; flightNumber?: 
 }
 
 /**
+ * Sanitizes a description string against markdown/HTML injection.
+ * Strips HTML tags, prevents code block injection, removes dangerous URLs,
+ * and limits total length.
+ */
+function sanitizeDescription(desc: string): string {
+  // Strip HTML tags
+  let clean = desc.replace(/<[^>]*>/g, '')
+  // Prevent code block injection (3+ backticks -> 1)
+  clean = clean.replace(/```+/g, '`')
+  // Strip javascript: and data: URLs in markdown links
+  clean = clean.replace(/\[([^\]]*)\]\((javascript|data):[^)]*\)/gi, '$1')
+  // Limit length
+  return clean.slice(0, 2000)
+}
+
+/**
  * Constructs a typed ICSEvent from the raw property map of a single VEVENT block.
  *
  * ICS text values use backslash escapes (\n for newline, \, for comma) that must
@@ -221,7 +237,7 @@ function buildEvent(props: Record<string, string>): ICSEvent | null {
     uid,
     summary,
     // Decode ICS text escapes before storing in the event object
-    description: description ? description.replace(/\\n/g, '\n').replace(/\\,/g, ',') : undefined,
+    description: description ? sanitizeDescription(description.replace(/\\n/g, '\n').replace(/\\,/g, ',')) : undefined,
     location,
     dtStart,
     dtEnd,

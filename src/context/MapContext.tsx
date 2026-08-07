@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, type ReactNode } from 'react'
+import { useState, useCallback, useMemo, useRef, type ReactNode } from 'react'
 import type { ActivityType } from '@/types'
 import { fetchNearbyPOIs, type POI } from '@/utils/overpass'
 import { MapContext } from '@/hooks/useMapContext'
@@ -116,22 +116,22 @@ export function MapProvider({ children }: { children: ReactNode }) {
     setFlyToTarget({ lat, lon, zoom })
   }, [])
 
+  const value = useMemo(() => ({
+    markers,
+    focusedMarkerId,
+    recommendations,
+    isLoadingRecs,
+    flyToTarget,
+    mapExpanded,
+    setMapExpanded,
+    setMarkers,
+    focusMarker,
+    clearFocus,
+    flyTo,
+  }), [markers, focusedMarkerId, recommendations, isLoadingRecs, flyToTarget, mapExpanded, setMapExpanded, setMarkers, focusMarker, clearFocus, flyTo])
+
   return (
-    <MapContext.Provider
-      value={{
-        markers,
-        focusedMarkerId,
-        recommendations,
-        isLoadingRecs,
-        flyToTarget,
-        mapExpanded,
-        setMapExpanded,
-        setMarkers,
-        focusMarker,
-        clearFocus,
-        flyTo,
-      }}
-    >
+    <MapContext.Provider value={value}>
       {children}
     </MapContext.Provider>
   )
