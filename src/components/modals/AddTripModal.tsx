@@ -61,7 +61,9 @@ export default function AddTripModal({ open, onClose }: AddTripModalProps) {
     if (debounceRef.current) clearTimeout(debounceRef.current)
     // Don't fetch for very short inputs -- they rarely produce good results
     if (destination.trim().length < 2) {
-      setPreviewImage(null)
+      debounceRef.current = setTimeout(() => {
+        setPreviewImage(null)
+      }, 0)
       return
     }
     debounceRef.current = setTimeout(async () => {

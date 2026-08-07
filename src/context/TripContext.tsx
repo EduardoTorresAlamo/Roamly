@@ -1,7 +1,8 @@
-import { useCallback, type ReactNode } from 'react'
+import { useCallback, useState, type ReactNode } from 'react'
 import type { Trip, Activity } from '@/types'
 import { TripContext } from '@/hooks/useTripContext'
-import { useLocalStorage } from '@/hooks/useLocalStorage'
+import { useTripRepository } from '@/repository/TripRepository'
+import type { TripRepository } from '@/repository/TripRepository'
 import { generateId } from '@/utils/id'
 import { generateDayPlans } from '@/utils/dates'
 
@@ -20,6 +21,22 @@ interface AddTripPayload {
   coverImageAttribution?: string
   lat?: number
   lon?: number
+}
+
+/**
+ * Persists the single trip that a mutation touched.
+ *
+ * Called from inside functional state updaters after the next `trips` array is
+ * computed; `repo.save` is an idempotent upsert, so StrictMode's double-invocation
+ * of the updater cannot corrupt storage.
+ *
+ * @param repo - The active repository
+ * @param nextTrips - The freshly computed trips array
+ * @param tripId - Id of the trip that changed
+ */
+function persistTrip(repo: TripRepository, nextTrips: Trip[], tripId: string): void {
+  const updated = nextTrips.find((t) => t.id === tripId)
+  if (updated) repo.save(updated)
 }
 
 /**
@@ -57,16 +74,34 @@ export interface TripContextValue {
 }
 
 /**
- * Provides trip CRUD operations and localStorage persistence to the component tree.
+ * Provides trip CRUD operations and persistence to the component tree.
  *
- * All trip data lives in localStorage under the key 'wanderplan-trips'. There is
- * no remote backend; localStorage is the source of truth for the entire app.
+ * Persistence is delegated to a {@link TripRepository} rather than touching
+ * `localStorage` directly, so the storage backend can be swapped without changing
+ * this component or its consumers. By default the repository is the shared
+ * localStorage-backed one (source of truth for the whole app); pass `repository`
+ * to inject a different implementation (e.g. an in-memory fake in tests).
  *
+ * React state mirrors the repository: it is seeded from `repository.getAll()` on
+ * mount, and every mutation updates both state (for re-render) and the repository
+ * (for durability). The repository writes below live inside the functional state
+ * updater and are intentionally idempotent (upsert / filtered-delete), so React
+ * 18/19 StrictMode's double-invocation of updaters cannot corrupt storage.
+ *
+ * @param repository - Optional persistence backend; defaults to the context/localStorage repo
  * @param children - React subtree that will have access to the context
  */
-export function TripProvider({ children }: { children: ReactNode }) {
-  // 'wanderplan-trips' is the localStorage key used for the entire trip dataset
-  const [trips, setTrips] = useLocalStorage<Trip[]>('wanderplan-trips', [])
+export function TripProvider({
+  children,
+  repository,
+}: {
+  children: ReactNode
+  repository?: TripRepository
+}) {
+  const contextRepository = useTripRepository()
+  const repo = repository ?? contextRepository
+  // Seed React state from the repository once, on mount.
+  const [trips, setTrips] = useState<Trip[]>(() => repo.getAll())
 
   const addTrip = useCallback(
     (payload: AddTripPayload): string => {
@@ -86,35 +121,45 @@ export function TripProvider({ children }: { children: ReactNode }) {
       }
       // Functional update avoids losing trips when multiple mutations land
       // before React re-renders (e.g. rapid adds or async geocoding callbacks)
-      setTrips((prev) => [...prev, newTrip])
+      setTrips((prev) => {
+        repo.save(newTrip)
+        return [...prev, newTrip]
+      })
       return id
     },
-    [setTrips],
+    [repo],
   )
 
   // Used by calendar import where the day structure is built from ICS events
   const addTripFull = useCallback(
     (trip: Omit<Trip, 'id'>): string => {
       const id = generateId()
-      setTrips((prev) => [...prev, { ...trip, id }])
+      const newTrip: Trip = { ...trip, id }
+      setTrips((prev) => {
+        repo.save(newTrip)
+        return [...prev, newTrip]
+      })
       return id
     },
-    [setTrips],
+    [repo],
   )
 
   const deleteTrip = useCallback(
     (tripId: string) => {
-      setTrips((prev) => prev.filter((t) => t.id !== tripId))
+      setTrips((prev) => {
+        repo.delete(tripId)
+        return prev.filter((t) => t.id !== tripId)
+      })
     },
-    [setTrips],
+    [repo],
   )
 
   const addActivity = useCallback(
     (tripId: string, dayId: string, activity: Omit<Activity, 'id'>) => {
       const newActivity: Activity = { ...activity, id: generateId() }
       // Immutable update: map over trips -> days -> activities; only the target day changes
-      setTrips((prev) =>
-        prev.map((trip) =>
+      setTrips((prev) => {
+        const next = prev.map((trip) =>
           trip.id !== tripId
             ? trip
             : {
@@ -125,17 +170,19 @@ export function TripProvider({ children }: { children: ReactNode }) {
                     : { ...day, activities: [...day.activities, newActivity] },
                 ),
               },
-        ),
-      )
+        )
+        persistTrip(repo, next, tripId)
+        return next
+      })
     },
-    [setTrips],
+    [repo],
   )
 
   const deleteActivity = useCallback(
     (tripId: string, dayId: string, activityId: string) => {
       // Same immutable traversal pattern as addActivity; only the target activity is removed
-      setTrips((prev) =>
-        prev.map((trip) =>
+      setTrips((prev) => {
+        const next = prev.map((trip) =>
           trip.id !== tripId
             ? trip
             : {
@@ -146,16 +193,18 @@ export function TripProvider({ children }: { children: ReactNode }) {
                     : { ...day, activities: day.activities.filter((a) => a.id !== activityId) },
                 ),
               },
-        ),
-      )
+        )
+        persistTrip(repo, next, tripId)
+        return next
+      })
     },
-    [setTrips],
+    [repo],
   )
 
   const moveActivity = useCallback(
     (tripId: string, dayId: string, fromIndex: number, toIndex: number) => {
-      setTrips((prev) =>
-        prev.map((trip) =>
+      setTrips((prev) => {
+        const next = prev.map((trip) =>
           trip.id !== tripId
             ? trip
             : {
@@ -179,10 +228,12 @@ export function TripProvider({ children }: { children: ReactNode }) {
                   return { ...day, activities }
                 }),
               },
-        ),
-      )
+        )
+        persistTrip(repo, next, tripId)
+        return next
+      })
     },
-    [setTrips],
+    [repo],
   )
 
   const getTripById = useCallback(
