@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Plus, ChevronLeft, CalendarDays, Map, ChevronUp, Download, Check } from 'lucide-react'
+import { Plus, ChevronLeft, CalendarDays, CalendarArrowDown, Map, ChevronUp, Download, Check } from 'lucide-react'
 import { useTrips } from '@/hooks/useTrips'
 import { formatDate, formatDateRange, getTripDurationDays } from '@/utils/dates'
 import { ACTIVITY_META } from '@/utils/activityIcons'
+import { downloadTripICS } from '@/utils/icsExport'
 import { useMapContext } from '@/hooks/useMapContext'
 import DayTabs from '@/components/trip/DayTabs'
 import ActivityTimeline from '@/components/trip/ActivityTimeline'
@@ -79,6 +80,8 @@ export default function TripDetail() {
   const [addModalOpen, setAddModalOpen] = useState(false)
   // Brief confirmation shown after the itinerary is copied to the clipboard
   const [copied, setCopied] = useState(false)
+  // Brief confirmation shown after the .ics calendar file is downloaded
+  const [calendarExported, setCalendarExported] = useState(false)
   // Id of the activity awaiting delete confirmation, or null when no prompt is open
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
@@ -88,6 +91,13 @@ export default function TripDetail() {
     const timer = setTimeout(() => setCopied(false), 2000)
     return () => clearTimeout(timer)
   }, [copied])
+
+  // Same 2 second auto-dismiss for the calendar export confirmation
+  useEffect(() => {
+    if (!calendarExported) return
+    const timer = setTimeout(() => setCalendarExported(false), 2000)
+    return () => clearTimeout(timer)
+  }, [calendarExported])
 
   // Center the map on this trip's destination whenever the tripId route param changes.
   // clearFocus() dismisses any NearbyPanel left over from a previously viewed trip.
@@ -177,6 +187,20 @@ export default function TripDetail() {
     } catch {
       // Clipboard access can fail (e.g. denied permission or insecure context);
       // fail silently rather than crashing the page.
+    }
+  }
+
+  /**
+   * Serializes the trip to an iCalendar (.ics) file and downloads it, so the
+   * itinerary can be imported into Apple Calendar, Google Calendar, or Outlook.
+   */
+  function handleExportCalendar() {
+    try {
+      downloadTripICS(trip!)
+      setCalendarExported(true)
+    } catch {
+      // Blob/object-URL creation can fail in restrictive environments; fail
+      // silently rather than crashing the page.
     }
   }
 
@@ -277,6 +301,25 @@ export default function TripDetail() {
               }
             </button>
 
+            {/* Export itinerary as an .ics calendar file.
+                Label is hidden on narrow screens so three actions still fit. */}
+            <button
+              onClick={handleExportCalendar}
+              aria-label="Export calendar"
+              title="Export calendar (.ics)"
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all',
+                calendarExported
+                  ? 'bg-accent/20 border-accent/40 text-accent'
+                  : 'border-white/[0.12] text-white/40 hover:text-white hover:border-white/25',
+              )}
+            >
+              {calendarExported
+                ? <><Check className="w-3.5 h-3.5" /><span className="hidden sm:inline">Saved</span></>
+                : <><CalendarArrowDown className="w-3.5 h-3.5" /><span className="hidden sm:inline">Calendar</span></>
+              }
+            </button>
+
             {/* Map toggle button */}
             <button
               onClick={() => setMapExpanded(!mapExpanded)}
@@ -326,17 +369,17 @@ export default function TripDetail() {
         <Plus className="w-7 h-7 stroke-[2.5]" />
       </button>
 
-      {/* ── "Itinerary copied!" toast ── */}
+      {/* ── Export confirmation toast (shared by both export actions) ── */}
       <div
         className={cn(
           'fixed top-6 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 glass-panel rounded-full px-4 py-2 text-sm font-medium text-white transition-all duration-300',
-          copied ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 pointer-events-none',
+          copied || calendarExported ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 pointer-events-none',
         )}
         role="status"
         aria-live="polite"
       >
         <Check className="w-4 h-4 text-accent" />
-        Itinerary copied!
+        {copied ? 'Itinerary copied!' : 'Calendar downloaded!'}
       </div>
 
       <AddActivityModal
