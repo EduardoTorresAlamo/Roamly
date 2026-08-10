@@ -76,7 +76,7 @@ function MacOSMenuBar() {
  * is the desired "run once on mount" behavior.
  */
 function MapCenterOnLoad() {
-  const { trips } = useTrips()
+  const trips = useTrips()
   const { flyTo } = useMapContext()
 
   useEffect(() => {

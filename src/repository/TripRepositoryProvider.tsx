@@ -14,7 +14,7 @@ import {
  *
  * Lives in its own file (separate from the repository classes/hook) so Vite Fast
  * Refresh sees a component-only module — the same split the app uses for
- * TripContext / useTripContext.
+ * TripProvider / useTripContext.
  *
  * @param repository - Optional repository implementation to inject
  * @param children - React subtree that will have access to the repository

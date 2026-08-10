@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import { Upload, Calendar, Plane, Building2, X, Check, AlertCircle } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { useTrips } from '@/hooks/useTrips'
+import { useTripActions } from '@/hooks/useTrips'
 import { parseICS, groupEventsIntoTrip, type ICSEvent } from '@/utils/icsParser'
 import { generateDayPlans } from '@/utils/dates'
 import { generateId } from '@/utils/id'
@@ -88,7 +88,7 @@ function eventToActivity(event: ICSEvent): Omit<Activity, 'id'> {
  * @param onClose - Callback to close the dialog
  */
 export default function CalendarImportModal({ open, onClose }: CalendarImportModalProps) {
-  const { addTripFull } = useTrips()
+  const { addTripFull } = useTripActions()
   const navigate = useNavigate()
   const fileRef = useRef<HTMLInputElement>(null)
 

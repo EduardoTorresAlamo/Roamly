@@ -194,17 +194,68 @@ function extractFlightInfo(summary: string): { airline?: string; flightNumber?: 
 }
 
 /**
- * Sanitizes a description string against markdown/HTML injection.
- * Strips HTML tags, prevents code block injection, removes dangerous URLs,
- * and limits total length.
+ * URI schemes that can execute code or smuggle a payload when a description is
+ * placed in an href, opened by the OS, or pasted into a browser bar.
+ */
+const DANGEROUS_SCHEMES = /^(?:javascript|data|vbscript|file|blob|about)$/i
+
+/**
+ * Matches, in priority order:
+ *   1. a markdown link whose target carries an explicit scheme -- captured as
+ *      (linkText, scheme) so the scheme can be vetted. The target allows one
+ *      level of nested parentheses so `(javascript:alert(1))` is consumed whole
+ *      rather than leaving a dangling `)` behind.
+ *   2. a bare http/https/ftp URL, or a scheme-less `www.` host
+ *
+ * The markdown alternative is listed first so that a URL already inside a link
+ * is consumed by branch 1 and never reaches the bare-URL branch.
+ */
+const LINK_PATTERN =
+  /\[([^\]]*)\]\(\s*([a-z][a-z0-9+.-]*):(?:[^()]|\([^()]*\))*\)|(?:\b(?:https?|ftp):\/\/|\bwww\.)[^\s<>()]+/gi
+
+/** Dangerous scheme sitting in plain text, outside any markdown link. */
+const BARE_SCHEME_PATTERN = /\b(?:javascript|vbscript|data|file|blob):\S*/gi
+
+/**
+ * Sanitizes an ICS DESCRIPTION against markdown/HTML injection and link-based
+ * phishing.
+ *
+ * ICS files are attacker-supplied input: anyone who can send a calendar invite
+ * controls this string. The passes below run in a fixed order:
+ *
+ *   1. strip HTML tags
+ *   2. collapse fenced code blocks
+ *   3. neutralize links -- markdown links with a dangerous scheme are reduced to
+ *      their label, and bare URLs are removed entirely (a raw link in an imported
+ *      description is the classic phishing vector, since the visible text and the
+ *      destination are the same string the attacker chose)
+ *   4. strip dangerous schemes left in plain text
+ *   5. cap the length
+ *
+ * Sanitization is defence in depth, not the primary control: the result is only
+ * ever rendered as a React text child (ActivityItem renders `activity.notes` as
+ * `{...}` inside a <p>), never through dangerouslySetInnerHTML, so React escapes
+ * it regardless. Keep it that way -- no component may pass a description or the
+ * `notes` field derived from it to dangerouslySetInnerHTML.
  */
 function sanitizeDescription(desc: string): string {
   // Strip HTML tags
   let clean = desc.replace(/<[^>]*>/g, '')
   // Prevent code block injection (3+ backticks -> 1)
   clean = clean.replace(/```+/g, '`')
-  // Strip javascript: and data: URLs in markdown links
-  clean = clean.replace(/\[([^\]]*)\]\((javascript|data):[^)]*\)/gi, '$1')
+
+  // Single pass so markdown links and bare URLs cannot be confused for each other
+  clean = clean.replace(LINK_PATTERN, (match, linkText: string, scheme?: string) => {
+    // Branch 1: markdown link. Keep safe schemes intact, drop the target of
+    // dangerous ones while preserving the human-readable label.
+    if (scheme !== undefined) return DANGEROUS_SCHEMES.test(scheme) ? linkText : match
+    // Branch 2: an unwrapped URL -- remove it rather than trust the domain
+    return '(link removed)'
+  })
+
+  // Dangerous schemes typed as plain text, e.g. "file:///etc/passwd"
+  clean = clean.replace(BARE_SCHEME_PATTERN, '(blocked)')
+
   // Limit length
   return clean.slice(0, 2000)
 }

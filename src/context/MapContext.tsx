@@ -1,7 +1,8 @@
-import { useState, useCallback, useMemo, useRef, type ReactNode } from 'react'
+import { useState, useCallback, useMemo, type ReactNode } from 'react'
 import type { ActivityType } from '@/types'
-import { fetchNearbyPOIs, type POI } from '@/utils/overpass'
+import type { POI } from '@/utils/overpass'
 import { MapContext } from '@/hooks/useMapContext'
+import { usePOIService } from '@/hooks/usePOIService'
 
 /**
  * A single activity pin to display on the Leaflet map.
@@ -71,14 +72,17 @@ export interface MapContextValue {
 export function MapProvider({ children }: { children: ReactNode }) {
   const [markers, setMarkersState] = useState<MapMarker[]>([])
   const [focusedMarkerId, setFocusedMarkerId] = useState<string | null>(null)
-  const [recommendations, setRecommendations] = useState<POI[]>([])
-  const [isLoadingRecs, setIsLoadingRecs] = useState(false)
   const [flyToTarget, setFlyToTarget] = useState<FlyToTarget | null>(null)
   const [mapExpanded, setMapExpanded] = useState(false)
 
-  // Monotonic id for POI fetches. Focusing marker B while marker A's fetch is
-  // still in flight must not let A's late response overwrite B's results.
-  const poiRequestIdRef = useRef(0)
+  // Overpass lookups (debouncing, loading state, stale-response cancellation)
+  // live in usePOIService; this provider only decides when to start and stop them.
+  const {
+    results: recommendations,
+    isLoading: isLoadingRecs,
+    search: searchNearbyPOIs,
+    cancel: cancelNearbyPOIs,
+  } = usePOIService()
 
   // Wrapped in useCallback to keep the reference stable and avoid re-rendering
   // ActivityMarkers every time unrelated context state changes
@@ -92,25 +96,14 @@ export function MapProvider({ children }: { children: ReactNode }) {
     setFlyToTarget({ lat, lon, zoom: 16 })
     // Always reveal the full map when focusing a place so the user can see context
     setMapExpanded(true)
-    setIsLoadingRecs(true)
-    setRecommendations([])
-    // Fetch POIs from Overpass API; update state when the promise resolves.
-    // Ignore the response if another focus/clear happened in the meantime.
-    const requestId = ++poiRequestIdRef.current
-    fetchNearbyPOIs(lat, lon).then((pois) => {
-      if (poiRequestIdRef.current !== requestId) return
-      setRecommendations(pois)
-      setIsLoadingRecs(false)
-    })
-  }, [])
+    searchNearbyPOIs(lat, lon)
+  }, [searchNearbyPOIs])
 
   const clearFocus = useCallback(() => {
-    // Invalidate any in-flight POI fetch so it cannot repopulate the panel
-    poiRequestIdRef.current++
+    // Invalidate any pending/in-flight POI fetch so it cannot repopulate the panel
+    cancelNearbyPOIs()
     setFocusedMarkerId(null)
-    setRecommendations([])
-    setIsLoadingRecs(false)
-  }, [])
+  }, [cancelNearbyPOIs])
 
   const flyTo = useCallback((lat: number, lon: number, zoom = 12) => {
     setFlyToTarget({ lat, lon, zoom })

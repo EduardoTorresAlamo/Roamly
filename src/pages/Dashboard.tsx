@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Plus, Calendar, Upload, ChevronLeft, ChevronRight, Search } from 'lucide-react'
-import { useTrips } from '@/hooks/useTrips'
+import { useTripActions, useTrips } from '@/hooks/useTrips'
 import { useMapContext } from '@/hooks/useMapContext'
 import TripGrid from '@/components/dashboard/TripGrid'
 import AddTripModal from '@/components/modals/AddTripModal'
@@ -121,7 +121,8 @@ function PhotoGalleryWidget({ trips }: { trips: { coverImageThumb?: string; dest
  * the Leaflet map base layer shows through without being obscured by panel glass.
  */
 export default function Dashboard() {
-  const { trips, deleteTrip } = useTrips()
+  const trips = useTrips()
+  const { deleteTrip } = useTripActions()
   const { mapExpanded } = useMapContext()
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [importModalOpen, setImportModalOpen] = useState(false)

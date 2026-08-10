@@ -1,6 +1,6 @@
-import { useCallback, useState, type ReactNode } from 'react'
+import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import type { Trip, Activity } from '@/types'
-import { TripContext } from '@/hooks/useTripContext'
+import { TripDispatchContext, TripStateContext } from '@/hooks/useTripContext'
 import { useTripRepository } from '@/repository/TripRepository'
 import type { TripRepository } from '@/repository/TripRepository'
 import { generateId } from '@/utils/id'
@@ -40,14 +40,17 @@ function persistTrip(repo: TripRepository, nextTrips: Trip[], tripId: string): v
 }
 
 /**
- * The value exposed by TripContext to consuming components.
+ * The mutation half of the trip context, exposed via `TripDispatchContext`.
  *
- * All mutations update localStorage via useLocalStorage, so no separate
- * persistence step is needed after calling any of these functions.
+ * Read access lives in `TripStateContext` instead (see `useTripState` /
+ * `useTripById`). Every function here depends only on the repository, never on
+ * the current trips array, which is what lets the whole object stay
+ * referentially stable across mutations.
+ *
+ * All mutations persist through the repository, so no separate persistence step
+ * is needed after calling any of these functions.
  */
-export interface TripContextValue {
-  /** All persisted trips in insertion order */
-  trips: Trip[]
+export interface TripDispatchValue {
   /**
    * Creates a new trip from minimal user input and generates its day structure.
    * @returns The new trip's id (for immediate navigation)
@@ -69,8 +72,6 @@ export interface TripContextValue {
    * Used by the timeline's native drag-and-drop reordering.
    */
   moveActivity: (tripId: string, dayId: string, fromIndex: number, toIndex: number) => void
-  /** Returns the Trip with the given id, or undefined if not found */
-  getTripById: (tripId: string) => Trip | undefined
 }
 
 /**
@@ -236,14 +237,21 @@ export function TripProvider({
     [repo],
   )
 
-  const getTripById = useCallback(
-    (tripId: string) => trips.find((t) => t.id === tripId),
-    [trips],
+  // Every callback below depends only on `repo`, so this object keeps the same
+  // identity for the provider's lifetime. Components that consume dispatch
+  // without consuming state therefore never re-render on a trip mutation.
+  const dispatch = useMemo<TripDispatchValue>(
+    () => ({ addTrip, addTripFull, deleteTrip, addActivity, deleteActivity, moveActivity }),
+    [addTrip, addTripFull, deleteTrip, addActivity, deleteActivity, moveActivity],
   )
 
+  // Dispatch sits outside state so a state update never remounts the dispatch
+  // provider's subtree boundary
   return (
-    <TripContext.Provider value={{ trips, addTrip, addTripFull, deleteTrip, addActivity, deleteActivity, moveActivity, getTripById }}>
-      {children}
-    </TripContext.Provider>
+    <TripDispatchContext.Provider value={dispatch}>
+      <TripStateContext.Provider value={trips}>
+        {children}
+      </TripStateContext.Provider>
+    </TripDispatchContext.Provider>
   )
 }

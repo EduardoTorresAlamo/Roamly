@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Plus, ChevronLeft, CalendarDays, CalendarArrowDown, Map, ChevronUp, Download, Check } from 'lucide-react'
-import { useTrips } from '@/hooks/useTrips'
+import { useTripActions, useTripById } from '@/hooks/useTrips'
 import { formatDate, formatDateRange, getTripDurationDays } from '@/utils/dates'
 import { ACTIVITY_META } from '@/utils/activityIcons'
 import { downloadTripICS } from '@/utils/icsExport'
@@ -71,9 +71,9 @@ function generateItineraryMarkdown(trip: Trip): string {
  */
 export default function TripDetail() {
   const { tripId } = useParams<{ tripId: string }>()
-  const { getTripById, addActivity, deleteActivity, moveActivity } = useTrips()
+  const { addActivity, deleteActivity, moveActivity } = useTripActions()
   const { setMarkers, flyTo, clearFocus, mapExpanded, setMapExpanded } = useMapContext()
-  const trip = getTripById(tripId ?? '')
+  const trip = useTripById(tripId ?? '')
 
   // Default to day 1 on initial render; lazy initializer avoids an extra render cycle
   const [selectedDayId, setSelectedDayId] = useState<string>(() => trip?.days[0]?.id ?? '')

@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { useTrips } from '@/hooks/useTrips'
+import { useTripActions } from '@/hooks/useTrips'
 import { fetchDestinationImage } from '@/utils/destinationImages'
 
 interface AddTripModalProps {
@@ -33,7 +33,7 @@ interface AddTripModalProps {
  * @param onClose - Callback to close the dialog without saving
  */
 export default function AddTripModal({ open, onClose }: AddTripModalProps) {
-  const { addTrip } = useTrips()
+  const { addTrip } = useTripActions()
   const navigate = useNavigate()
 
   const [destination, setDestination] = useState('')
