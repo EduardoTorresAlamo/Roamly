@@ -1,17 +1,63 @@
+import { createContext, useContext } from 'react'
+import type { Trip } from '@/types'
+import type { TripDispatchValue } from '@/context/TripContext'
+
 /**
- * Convenience re-exports of the trip context hooks under shorter names.
+ * Trip state (the trips array) and trip actions live in two separate contexts.
  *
- * Components should import from this hook rather than reaching into the
- * context module directly, making the import path stable if the context
- * implementation changes.
+ * A single combined context forces every consumer to re-render whenever *any*
+ * trip changes, even components that only ever call a mutation. Splitting them
+ * means the dispatch value is memoized once and never changes identity, so
+ * action-only consumers (AddTripModal, CalendarImportModal) subscribe to a
+ * context that never updates and drop out of the re-render path entirely.
+ *
+ * Both contexts live here rather than next to TripProvider so that
+ * `TripContext.tsx` only exports React components — keeping Vite's Fast Refresh
+ * working for the provider file. The `TripDispatchValue` import above is
+ * type-only and therefore erased at build time, so there is no runtime import
+ * cycle between the two files.
  *
  * Pick the narrowest hook the component actually needs:
  *   useTrips()        -- the full trip list; re-renders on any trip change
  *   useTripById(id)   -- one trip; re-renders on any trip change
  *   useTripActions()  -- mutations only; never re-renders on a trip change
  */
-export {
-  useTripState as useTrips,
-  useTripDispatch as useTripActions,
-  useTripById,
-} from '@/hooks/useTripContext'
+export const TripStateContext = createContext<Trip[] | null>(null)
+
+/** Companion to {@link TripStateContext}; holds only the mutation functions. */
+export const TripDispatchContext = createContext<TripDispatchValue | null>(null)
+
+/**
+ * Subscribes to the trip list. Re-renders on every trip mutation.
+ *
+ * @throws If called outside of a TripProvider component tree
+ */
+export function useTrips(): Trip[] {
+  const ctx = useContext(TripStateContext)
+  if (!ctx) throw new Error('useTrips must be used within TripProvider')
+  return ctx
+}
+
+/**
+ * Returns the trip mutation functions without subscribing to trip state.
+ *
+ * The returned object is referentially stable for the lifetime of the provider,
+ * so components using only this hook never re-render due to trip changes.
+ *
+ * @throws If called outside of a TripProvider component tree
+ */
+export function useTripActions(): TripDispatchValue {
+  const ctx = useContext(TripDispatchContext)
+  if (!ctx) throw new Error('useTripActions must be used within TripProvider')
+  return ctx
+}
+
+/**
+ * Looks up a single trip by id.
+ *
+ * @param tripId - Id of the trip to find
+ * @returns The matching Trip, or undefined if no trip has that id
+ */
+export function useTripById(tripId: string): Trip | undefined {
+  return useTrips().find((t) => t.id === tripId)
+}

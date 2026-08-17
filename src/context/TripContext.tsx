@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import type { Trip, Activity } from '@/types'
-import { TripDispatchContext, TripStateContext } from '@/hooks/useTripContext'
+import { TripDispatchContext, TripStateContext } from '@/hooks/useTrips'
 import { useTripRepository } from '@/repository/TripRepository'
 import type { TripRepository } from '@/repository/TripRepository'
 import { generateId } from '@/utils/id'
