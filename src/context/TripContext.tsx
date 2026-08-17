@@ -1,7 +1,7 @@
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Trip, Activity } from '@/types'
 import { TripDispatchContext, TripStateContext } from '@/hooks/useTrips'
-import { useTripRepository } from '@/repository/TripRepository'
+import { useTripRepository, TRIPS_STORAGE_KEY } from '@/repository/TripRepository'
 import type { TripRepository } from '@/repository/TripRepository'
 import { generateId } from '@/utils/id'
 import { generateDayPlans } from '@/utils/dates'
@@ -103,6 +103,23 @@ export function TripProvider({
   const repo = repository ?? contextRepository
   // Seed React state from the repository once, on mount.
   const [trips, setTrips] = useState<Trip[]>(() => repo.getAll())
+
+  // Multi-tab sync: when another tab writes the trip dataset, the browser fires a
+  // `storage` event *in this tab only* (never in the tab that made the change).
+  // Re-seed React state from the repository so tab B reflects tab A's edits
+  // instead of holding a stale list that a later save would write back verbatim,
+  // clobbering A's changes. Each mutation persists via a read-modify-write upsert
+  // on the latest localStorage, so keeping in-memory state fresh here is what
+  // closes the last-writer-wins gap.
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      // `key === null` fires on storage.clear(); otherwise only react to our key.
+      if (e.key !== null && e.key !== TRIPS_STORAGE_KEY) return
+      setTrips(repo.getAll())
+    }
+    window.addEventListener('storage', handleStorage)
+    return () => window.removeEventListener('storage', handleStorage)
+  }, [repo])
 
   const addTrip = useCallback(
     (payload: AddTripPayload): string => {
