@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { useMapContext } from '@/hooks/useMapContext'
@@ -67,12 +67,29 @@ function makeIcon(type: ActivityType, focused: boolean) {
  * imperatively via effects.
  *
  * Markers are managed imperatively rather than via react-leaflet's Marker
- * component to avoid re-mount flicker when the focused marker changes -- Leaflet
- * handles the update internally through the effect cleanup/re-run cycle.
+ * component to avoid re-mount flicker when the focused marker changes. Live
+ * L.Marker instances are cached in a ref keyed by marker id: the marker-list
+ * effect only diffs (adds new, removes gone, moves changed), and a focus change
+ * mutates just the two affected markers in place rather than destroying and
+ * recreating every pin -- which would otherwise drop tooltips and flicker.
  */
 export default function ActivityMarkers() {
   const map = useMap()
   const { markers, focusedMarkerId, flyToTarget, focusMarker } = useMapContext()
+
+  // Cache of live Leaflet marker instances, keyed by marker id, kept alive across
+  // focus changes so we never destroy/recreate the whole set.
+  const markersRef = useRef<Map<string, L.Marker>>(new Map())
+  // Latest focusMarker callback, read via ref so the marker-list effect below does
+  // not depend on its identity (which would rebuild every marker if it changed).
+  const focusMarkerRef = useRef(focusMarker)
+  focusMarkerRef.current = focusMarker
+  // Latest focused id, read during marker creation without listing it as a dep of
+  // the marker-list effect (focus styling is applied by the dedicated effect).
+  const focusedIdRef = useRef(focusedMarkerId)
+  focusedIdRef.current = focusedMarkerId
+  // Previously-focused id so the focus effect knows which marker to un-focus.
+  const prevFocusedRef = useRef<string | null>(null)
 
   // Respond to flyToTarget changes set by MapContext.focusMarker and MapContext.flyTo
   useEffect(() => {
@@ -82,23 +99,43 @@ export default function ActivityMarkers() {
     }
   }, [flyToTarget, map])
 
-  // Re-render all markers whenever the list or the focused marker id changes.
-  // The cleanup function removes all existing Leaflet markers before the next
-  // render cycle adds fresh ones, preventing duplicate pins on the map.
+  // Diff the marker set against the cached instances: add markers that appeared,
+  // remove markers that vanished, and update position/icon for ones that changed.
+  // Existing instances are reused so their DOM (and bound tooltip) survives.
   useEffect(() => {
-    const leafletMarkers: L.Marker[] = []
+    const cache = markersRef.current
+    const nextIds = new Set(markers.map((m) => m.id))
+
+    // Remove markers no longer present in the list
+    for (const [id, marker] of cache) {
+      if (!nextIds.has(id)) {
+        marker.remove()
+        cache.delete(id)
+      }
+    }
 
     for (const m of markers) {
-      const isFocused = m.id === focusedMarkerId
-      const icon = makeIcon(m.type, isFocused)
+      const isFocused = m.id === focusedIdRef.current
+      const existing = cache.get(m.id)
+      if (existing) {
+        // Reuse the live instance; refresh only what may have changed.
+        existing.setLatLng([m.lat, m.lon])
+        existing.setIcon(makeIcon(m.type, isFocused))
+        existing.setZIndexOffset(isFocused ? 1000 : 0)
+        existing.setTooltipContent(m.title)
+        continue
+      }
+
       const marker = L.marker([m.lat, m.lon], {
-        icon,
+        icon: makeIcon(m.type, isFocused),
         // Raise focused marker above all others so it is never obscured
         zIndexOffset: isFocused ? 1000 : 0,
       })
 
-      // Clicking a marker focuses it and triggers a Nearby POI fetch via MapContext
-      marker.on('click', () => focusMarker(m.id, m.lat, m.lon))
+      // Clicking a marker focuses it and triggers a Nearby POI fetch via MapContext.
+      // Read the callback through a ref so this handler never goes stale and this
+      // effect need not depend on focusMarker's identity.
+      marker.on('click', () => focusMarkerRef.current(m.id, m.lat, m.lon))
 
       // Tooltip shown on hover; offset pushes it above the marker circle
       marker.bindTooltip(m.title, {
@@ -109,14 +146,45 @@ export default function ActivityMarkers() {
       })
 
       marker.addTo(map)
-      leafletMarkers.push(marker)
+      cache.set(m.id, marker)
+    }
+  }, [markers, map])
+
+  // Focus change: mutate only the previously-focused and newly-focused markers in
+  // place -- swap their icon (size/color) and z-index -- leaving all others alone.
+  useEffect(() => {
+    const cache = markersRef.current
+    const prevId = prevFocusedRef.current
+
+    if (prevId && prevId !== focusedMarkerId) {
+      const prev = cache.get(prevId)
+      const data = markers.find((m) => m.id === prevId)
+      if (prev && data) {
+        prev.setIcon(makeIcon(data.type, false))
+        prev.setZIndexOffset(0)
+      }
     }
 
-    // Cleanup: remove all markers before the effect re-runs to avoid duplicates
-    return () => {
-      leafletMarkers.forEach((m) => m.remove())
+    if (focusedMarkerId) {
+      const curr = cache.get(focusedMarkerId)
+      const data = markers.find((m) => m.id === focusedMarkerId)
+      if (curr && data) {
+        curr.setIcon(makeIcon(data.type, true))
+        curr.setZIndexOffset(1000)
+      }
     }
-  }, [markers, focusedMarkerId, map, focusMarker])
+
+    prevFocusedRef.current = focusedMarkerId
+  }, [focusedMarkerId, markers])
+
+  // Remove every marker on unmount so pins don't leak if the map stays mounted.
+  useEffect(() => {
+    const cache = markersRef.current
+    return () => {
+      for (const marker of cache.values()) marker.remove()
+      cache.clear()
+    }
+  }, [])
 
   // This component only drives Leaflet imperatively; it renders nothing to the React tree
   return null
