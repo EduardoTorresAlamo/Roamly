@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Trip, Activity } from '@/types'
 import { TripDispatchContext, TripStateContext } from '@/hooks/useTrips'
 import { useTripRepository, TRIPS_STORAGE_KEY } from '@/repository/TripRepository'
@@ -26,9 +26,9 @@ interface AddTripPayload {
 /**
  * Persists the single trip that a mutation touched.
  *
- * Called from inside functional state updaters after the next `trips` array is
- * computed; `repo.save` is an idempotent upsert, so StrictMode's double-invocation
- * of the updater cannot corrupt storage.
+ * Called after the next `trips` array is computed but *before* `setTrips`, so
+ * the repository write happens outside React's state updater (updaters must be
+ * pure). `repo.save` is an idempotent upsert.
  *
  * @param repo - The active repository
  * @param nextTrips - The freshly computed trips array
@@ -85,9 +85,11 @@ export interface TripDispatchValue {
  *
  * React state mirrors the repository: it is seeded from `repository.getAll()` on
  * mount, and every mutation updates both state (for re-render) and the repository
- * (for durability). The repository writes below live inside the functional state
- * updater and are intentionally idempotent (upsert / filtered-delete), so React
- * 18/19 StrictMode's double-invocation of updaters cannot corrupt storage.
+ * (for durability). The repository writes happen *before* `setTrips` — never
+ * inside a state updater, which must stay a pure function. A `tripsRef` mirrors
+ * the latest trips synchronously so mutations that land in the same tick (rapid
+ * adds, async geocoding callbacks) each build on the previous one instead of
+ * clobbering it.
  *
  * @param repository - Optional persistence backend; defaults to the context/localStorage repo
  * @param children - React subtree that will have access to the context
@@ -104,6 +106,16 @@ export function TripProvider({
   // Seed React state from the repository once, on mount.
   const [trips, setTrips] = useState<Trip[]>(() => repo.getAll())
 
+  // Synchronous mirror of the latest trips. Mutations read/derive from this ref
+  // (not the `trips` render snapshot), so several mutations firing before React
+  // re-renders each build on the previous result. `commit` is the single place
+  // that advances both the ref and React state together.
+  const tripsRef = useRef<Trip[]>(trips)
+  const commit = useCallback((next: Trip[]) => {
+    tripsRef.current = next
+    setTrips(next)
+  }, [])
+
   // Multi-tab sync: when another tab writes the trip dataset, the browser fires a
   // `storage` event *in this tab only* (never in the tab that made the change).
   // Re-seed React state from the repository so tab B reflects tab A's edits
@@ -115,11 +127,11 @@ export function TripProvider({
     const handleStorage = (e: StorageEvent) => {
       // `key === null` fires on storage.clear(); otherwise only react to our key.
       if (e.key !== null && e.key !== TRIPS_STORAGE_KEY) return
-      setTrips(repo.getAll())
+      commit(repo.getAll())
     }
     window.addEventListener('storage', handleStorage)
     return () => window.removeEventListener('storage', handleStorage)
-  }, [repo])
+  }, [repo, commit])
 
   const addTrip = useCallback(
     (payload: AddTripPayload): string => {
@@ -137,15 +149,13 @@ export function TripProvider({
         lat: payload.lat,
         lon: payload.lon,
       }
-      // Functional update avoids losing trips when multiple mutations land
-      // before React re-renders (e.g. rapid adds or async geocoding callbacks)
-      setTrips((prev) => {
-        repo.save(newTrip)
-        return [...prev, newTrip]
-      })
+      // Persist first, then commit. `tripsRef` (not a render snapshot) is the
+      // base, so rapid adds / async geocoding callbacks don't lose each other.
+      repo.save(newTrip)
+      commit([...tripsRef.current, newTrip])
       return id
     },
-    [repo],
+    [repo, commit],
   )
 
   // Used by calendar import where the day structure is built from ICS events
@@ -153,105 +163,95 @@ export function TripProvider({
     (trip: Omit<Trip, 'id'>): string => {
       const id = generateId()
       const newTrip: Trip = { ...trip, id }
-      setTrips((prev) => {
-        repo.save(newTrip)
-        return [...prev, newTrip]
-      })
+      repo.save(newTrip)
+      commit([...tripsRef.current, newTrip])
       return id
     },
-    [repo],
+    [repo, commit],
   )
 
   const deleteTrip = useCallback(
     (tripId: string) => {
-      setTrips((prev) => {
-        repo.delete(tripId)
-        return prev.filter((t) => t.id !== tripId)
-      })
+      repo.delete(tripId)
+      commit(tripsRef.current.filter((t) => t.id !== tripId))
     },
-    [repo],
+    [repo, commit],
   )
 
   const addActivity = useCallback(
     (tripId: string, dayId: string, activity: Omit<Activity, 'id'>) => {
       const newActivity: Activity = { ...activity, id: generateId() }
       // Immutable update: map over trips -> days -> activities; only the target day changes
-      setTrips((prev) => {
-        const next = prev.map((trip) =>
-          trip.id !== tripId
-            ? trip
-            : {
-                ...trip,
-                days: trip.days.map((day) =>
-                  day.id !== dayId
-                    ? day
-                    : { ...day, activities: [...day.activities, newActivity] },
-                ),
-              },
-        )
-        persistTrip(repo, next, tripId)
-        return next
-      })
+      const next = tripsRef.current.map((trip) =>
+        trip.id !== tripId
+          ? trip
+          : {
+              ...trip,
+              days: trip.days.map((day) =>
+                day.id !== dayId
+                  ? day
+                  : { ...day, activities: [...day.activities, newActivity] },
+              ),
+            },
+      )
+      persistTrip(repo, next, tripId)
+      commit(next)
     },
-    [repo],
+    [repo, commit],
   )
 
   const deleteActivity = useCallback(
     (tripId: string, dayId: string, activityId: string) => {
       // Same immutable traversal pattern as addActivity; only the target activity is removed
-      setTrips((prev) => {
-        const next = prev.map((trip) =>
-          trip.id !== tripId
-            ? trip
-            : {
-                ...trip,
-                days: trip.days.map((day) =>
-                  day.id !== dayId
-                    ? day
-                    : { ...day, activities: day.activities.filter((a) => a.id !== activityId) },
-                ),
-              },
-        )
-        persistTrip(repo, next, tripId)
-        return next
-      })
+      const next = tripsRef.current.map((trip) =>
+        trip.id !== tripId
+          ? trip
+          : {
+              ...trip,
+              days: trip.days.map((day) =>
+                day.id !== dayId
+                  ? day
+                  : { ...day, activities: day.activities.filter((a) => a.id !== activityId) },
+              ),
+            },
+      )
+      persistTrip(repo, next, tripId)
+      commit(next)
     },
-    [repo],
+    [repo, commit],
   )
 
   const moveActivity = useCallback(
     (tripId: string, dayId: string, fromIndex: number, toIndex: number) => {
-      setTrips((prev) => {
-        const next = prev.map((trip) =>
-          trip.id !== tripId
-            ? trip
-            : {
-                ...trip,
-                days: trip.days.map((day) => {
-                  if (day.id !== dayId) return day
-                  const activities = [...day.activities]
-                  // Guard against stale/out-of-range indices and no-op moves
-                  if (
-                    fromIndex < 0 ||
-                    fromIndex >= activities.length ||
-                    toIndex < 0 ||
-                    toIndex >= activities.length ||
-                    fromIndex === toIndex
-                  ) {
-                    return day
-                  }
-                  // Remove the dragged activity, then re-insert it at the drop index
-                  const [moved] = activities.splice(fromIndex, 1)
-                  activities.splice(toIndex, 0, moved)
-                  return { ...day, activities }
-                }),
-              },
-        )
-        persistTrip(repo, next, tripId)
-        return next
-      })
+      const next = tripsRef.current.map((trip) =>
+        trip.id !== tripId
+          ? trip
+          : {
+              ...trip,
+              days: trip.days.map((day) => {
+                if (day.id !== dayId) return day
+                const activities = [...day.activities]
+                // Guard against stale/out-of-range indices and no-op moves
+                if (
+                  fromIndex < 0 ||
+                  fromIndex >= activities.length ||
+                  toIndex < 0 ||
+                  toIndex >= activities.length ||
+                  fromIndex === toIndex
+                ) {
+                  return day
+                }
+                // Remove the dragged activity, then re-insert it at the drop index
+                const [moved] = activities.splice(fromIndex, 1)
+                activities.splice(toIndex, 0, moved)
+                return { ...day, activities }
+              }),
+            },
+      )
+      persistTrip(repo, next, tripId)
+      commit(next)
     },
-    [repo],
+    [repo, commit],
   )
 
   // Every callback below depends only on `repo`, so this object keeps the same
