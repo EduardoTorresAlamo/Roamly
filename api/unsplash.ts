@@ -29,6 +29,61 @@ interface DestinationImage {
 const CACHE_TTL_MS = 60 * 60 * 1000
 const cache = new Map<string, { at: number; value: DestinationImage }>()
 
+// Best-effort per-caller token bucket in front of the Unsplash upstream, so one
+// client cannot burn through the access key's rate limit. Capacity is the burst
+// allowance; a token is restored every RATE_REFILL_MS (≈20 requests/minute
+// sustained). Like the cache above, edge instances are not shared, so this bounds
+// abuse per-instance rather than globally.
+const RATE_CAPACITY = 20
+const RATE_REFILL_MS = 3000
+const MAX_BUCKETS = 5000
+const buckets = new Map<string, { tokens: number; last: number }>()
+
+/**
+ * Consumes one token for the given caller key.
+ *
+ * @param key - Identifier for the caller (client IP, falling back to origin)
+ * @returns true when the caller is over budget and should be rejected
+ */
+function rateLimited(key: string): boolean {
+  const now = Date.now()
+  let bucket = buckets.get(key)
+  if (!bucket) {
+    // Evict the oldest bucket when full so the map can't grow without bound
+    if (buckets.size >= MAX_BUCKETS) {
+      const oldest = buckets.keys().next().value
+      if (oldest !== undefined) buckets.delete(oldest)
+    }
+    bucket = { tokens: RATE_CAPACITY, last: now }
+    buckets.set(key, bucket)
+  } else {
+    const refill = Math.floor((now - bucket.last) / RATE_REFILL_MS)
+    if (refill > 0) {
+      bucket.tokens = Math.min(RATE_CAPACITY, bucket.tokens + refill)
+      // Advance by whole refill intervals only, so the fractional remainder carries over
+      bucket.last += refill * RATE_REFILL_MS
+    }
+  }
+  if (bucket.tokens < 1) return true
+  bucket.tokens -= 1
+  return false
+}
+
+/**
+ * Derives a rate-limit key for the caller, preferring the client IP (so distinct
+ * users on the same origin get independent budgets) and falling back to the origin.
+ *
+ * @param request - Incoming request
+ * @param fallback - Origin to key on when no client IP header is present
+ */
+function clientKey(request: Request, fallback: string): string {
+  const forwarded = request.headers.get('x-forwarded-for')
+  if (forwarded) return forwarded.split(',')[0].trim()
+  const real = request.headers.get('x-real-ip')
+  if (real) return real.trim()
+  return fallback
+}
+
 /**
  * Extra origins allowed to call this proxy, as a comma-separated list of absolute
  * URLs (e.g. `https://roamly.app,https://staging.roamly.app`). The deployment's own
@@ -178,6 +233,19 @@ export default async function handler(request: Request): Promise<Response> {
   const cached = cache.get(cacheKey)
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
     return json(cached.value, 200, corsOrigin)
+  }
+
+  // Only cache misses reach the upstream, so the limiter is checked here — cache
+  // hits (which never touch the access key) are always served.
+  if (rateLimited(clientKey(request, caller as string))) {
+    const headers: Record<string, string> = {
+      'content-type': 'application/json',
+      'cache-control': 'no-store',
+      vary: 'Origin',
+      'retry-after': String(Math.ceil(RATE_REFILL_MS / 1000)),
+    }
+    if (corsOrigin) headers['access-control-allow-origin'] = corsOrigin
+    return new Response(JSON.stringify({ error: 'Rate limit exceeded' }), { status: 429, headers })
   }
 
   try {
