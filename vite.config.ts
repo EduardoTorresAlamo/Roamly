@@ -1,10 +1,33 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+// Relax the production CSP (in index.html) for the dev server only: Vite's HMR
+// injects an inline React-refresh preamble and connects back over a websocket,
+// neither of which the strict production policy allows.
+function devCspHmr(): Plugin {
+  const devCsp =
+    "default-src 'self'; base-uri 'self'; object-src 'none'; " +
+    "img-src 'self' data: blob: https://images.unsplash.com https://*.basemaps.cartocdn.com; " +
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+    "style-src 'self' 'unsafe-inline'; font-src 'self' data:; " +
+    "connect-src 'self' ws: wss: https://nominatim.openstreetmap.org https://overpass-api.de; " +
+    "worker-src 'self' blob:"
+  return {
+    name: 'dev-csp-hmr',
+    apply: 'serve',
+    transformIndexHtml(html) {
+      return html.replace(
+        /(<meta\s+http-equiv="Content-Security-Policy"\s+content=")[^"]*(")/,
+        (_m, pre: string, post: string) => pre + devCsp + post,
+      )
+    },
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), devCspHmr()],
   base: './',
   resolve: {
     alias: {

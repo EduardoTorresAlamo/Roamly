@@ -2,6 +2,17 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!--
+      Production Content Security Policy. The Vite dev server relaxes this at
+      serve time (see the dev-csp-hmr plugin in vite.config.ts) to permit HMR's
+      inline scripts and websocket connection.
+        img-src     images.unsplash.com (covers), *.basemaps.cartocdn.com (map tiles)
+        connect-src nominatim (geocoding), overpass-api.de (nearby POIs), self (Unsplash proxy)
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data: blob: https://images.unsplash.com https://*.basemaps.cartocdn.com; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' https://nominatim.openstreetmap.org https://overpass-api.de; worker-src 'self' blob:"
+    />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1" />
     <title>WanderPlan</title>
