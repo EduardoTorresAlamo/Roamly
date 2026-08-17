@@ -2,58 +2,16 @@ import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Plus, ChevronLeft, CalendarDays, CalendarArrowDown, Map, ChevronUp, Download, Check } from 'lucide-react'
 import { useTripActions, useTripById } from '@/hooks/useTrips'
-import { formatDate, formatDateRange, getTripDurationDays } from '@/utils/dates'
-import { ACTIVITY_META } from '@/utils/activityIcons'
+import { formatDateRange, getTripDurationDays } from '@/utils/dates'
 import { downloadTripICS } from '@/utils/icsExport'
+import { generateItineraryMarkdown } from '@/utils/itineraryMarkdown'
 import { useMapContext } from '@/hooks/useMapContext'
 import DayTabs from '@/components/trip/DayTabs'
 import ActivityTimeline from '@/components/trip/ActivityTimeline'
 import AddActivityModal from '@/components/modals/AddActivityModal'
 import ConfirmDialog from '@/components/modals/ConfirmDialog'
-import type { Activity, Trip } from '@/types'
+import type { Activity } from '@/types'
 import { cn } from '@/lib/utils'
-
-/**
- * Serializes an entire trip into a human-readable markdown itinerary.
- *
- * Produces a top-level heading with the destination, a summary line with the
- * date range and duration, then a section per day listing each activity with its
- * time, title, type, and notes. Activities are ordered chronologically by start time.
- *
- * @param trip - The trip to serialize
- * @returns A markdown string representing the full itinerary
- */
-function generateItineraryMarkdown(trip: Trip): string {
-  const duration = getTripDurationDays(trip.startDate, trip.endDate)
-  const lines: string[] = [
-    `# ${trip.destination}`,
-    '',
-    `${formatDateRange(trip.startDate, trip.endDate)} · ${duration} ${duration === 1 ? 'day' : 'days'}`,
-    '',
-  ]
-
-  trip.days.forEach((day, i) => {
-    lines.push(`## Day ${i + 1} — ${formatDate(day.date)}`, '')
-
-    if (day.activities.length === 0) {
-      lines.push('_No activities planned._', '')
-      return
-    }
-
-    // Chronological order by HH:mm start time (lexicographic matches chronological)
-    const sorted = [...day.activities].sort((a, b) => a.startTime.localeCompare(b.startTime))
-    sorted.forEach((activity) => {
-      const label = ACTIVITY_META[activity.type].label
-      const time =
-        activity.startTime && activity.startTime !== '00:00' ? `${activity.startTime} · ` : ''
-      lines.push(`- **${time}${activity.title}** _(${label})_`)
-      if (activity.notes) lines.push(`  ${activity.notes}`)
-    })
-    lines.push('')
-  })
-
-  return lines.join('\n')
-}
 
 /**
  * Trip detail page displaying the day-by-day itinerary and the interactive map.
