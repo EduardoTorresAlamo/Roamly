@@ -25,13 +25,32 @@ export interface TripRepository {
 export const TRIPS_STORAGE_KEY = 'wanderplan-trips'
 
 /**
+ * Thrown by the private `read()` when stored data exists but cannot be parsed.
+ *
+ * Distinguishes a genuinely empty store (missing key → `[]`) from corrupted
+ * data. Mutations (`save`/`delete`) let this propagate so they refuse to write,
+ * which prevents a read-modify-write from silently overwriting — and destroying
+ * — recoverable data. Read-only accessors (`getAll`/`getById`) catch it and
+ * degrade to an empty view.
+ */
+export class TripRepositoryReadError extends Error {
+  constructor(key: string, cause: unknown) {
+    super(`LocalStorageTripRepository: failed to parse "${key}"`)
+    this.name = 'TripRepositoryReadError'
+    this.cause = cause
+  }
+}
+
+/**
  * `TripRepository` backed by the browser's `localStorage`.
  *
  * The whole dataset lives under a single key as a JSON array — the exact format
  * the app used before this abstraction existed, so pre-existing user data loads
- * without migration. Reads and writes go through `read`/`write`, which fail soft
- * (log + fall back) rather than throwing, matching the previous `useLocalStorage`
- * behavior in private-browsing / quota-exceeded situations.
+ * without migration. Writes fail soft (log + fall back) in private-browsing /
+ * quota-exceeded situations. Read-only accessors (`getAll`/`getById`) also
+ * degrade to an empty view on corruption, but the mutating `save`/`delete` let
+ * a parse error propagate so a read-modify-write can't overwrite data it failed
+ * to read (see `TripRepositoryReadError`).
  */
 export class LocalStorageTripRepository implements TripRepository {
   // Explicit fields rather than TS parameter properties, which `erasableSyntaxOnly`
@@ -45,14 +64,23 @@ export class LocalStorageTripRepository implements TripRepository {
   }
 
   private read(): Trip[] {
+    let raw: string | null
     try {
-      const raw = this.storage.getItem(this.key)
-      return raw ? (JSON.parse(raw) as Trip[]) : []
+      raw = this.storage.getItem(this.key)
     } catch (err) {
-      // Corrupted JSON or an unavailable store degrades to "no trips" rather than
-      // crashing the app on load.
-      console.error(`LocalStorageTripRepository: failed to read "${this.key}"`, err)
+      // Store unavailable (e.g. private browsing): behave as empty, matching
+      // write()'s soft-fail. Not a parse error — no data is at risk here.
+      console.error(`LocalStorageTripRepository: failed to access "${this.key}"`, err)
       return []
+    }
+    // Missing key is a legitimately empty store, not corruption.
+    if (raw === null) return []
+    try {
+      return JSON.parse(raw) as Trip[]
+    } catch (err) {
+      // Data is present but unparseable. Throw instead of returning [] so a
+      // subsequent save()/delete() does not overwrite (and destroy) it.
+      throw new TripRepositoryReadError(this.key, err)
     }
   }
 
@@ -65,11 +93,19 @@ export class LocalStorageTripRepository implements TripRepository {
   }
 
   getAll(): Trip[] {
-    return this.read()
+    // Read-only path: degrade a corrupted store to an empty view rather than
+    // crashing on load. The underlying data is left untouched (see read()).
+    try {
+      return this.read()
+    } catch (err) {
+      console.error(err)
+      return []
+    }
   }
 
   getById(id: string): Trip | undefined {
-    return this.read().find((t) => t.id === id)
+    // Reuse getAll()'s corruption-tolerant read.
+    return this.getAll().find((t) => t.id === id)
   }
 
   save(trip: Trip): void {
