@@ -245,9 +245,10 @@ export function icsFilename(trip: Trip): string {
 /**
  * Generates the .ics file for a trip and triggers a browser download.
  *
- * The object URL is revoked on the next tick rather than immediately: Safari reads
- * the blob asynchronously after the synthetic click, and revoking too early aborts
- * the download.
+ * Cleanup (removing the anchor and revoking the object URL) is deferred with a
+ * real delay: Safari/WebKit reads the blob asynchronously after the synthetic
+ * click, and a `setTimeout(0)` fires before the download is dispatched, aborting
+ * it. Both the anchor and the URL must therefore outlive that async read.
  *
  * @param trip - The trip to export
  */
@@ -260,7 +261,9 @@ export function downloadTripICS(trip: Trip): void {
   link.download = icsFilename(trip)
   document.body.appendChild(link)
   link.click()
-  document.body.removeChild(link)
 
-  setTimeout(() => URL.revokeObjectURL(url), 0)
+  setTimeout(() => {
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }, 1000)
 }
