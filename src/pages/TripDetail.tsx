@@ -73,6 +73,15 @@ export default function TripDetail() {
   // Resolve the selected day object; fall back to day 0 if selectedDayId is stale
   const selectedDay = trip?.days.find((d) => d.id === selectedDayId) ?? trip?.days[0]
 
+  // Reset the orphaned selection when selectedDayId no longer names a day in the
+  // current trip -- e.g. after navigating to a different trip (same component
+  // instance) or after the selected day is removed. Adjusting state during render
+  // (React's recommended pattern over an effect) keeps the raw state in sync with
+  // the fallback above; the guard makes it converge in a single extra render.
+  if (trip && selectedDayId && !trip.days.some((d) => d.id === selectedDayId)) {
+    setSelectedDayId(trip.days[0]?.id ?? '')
+  }
+
   // Sync map markers to the currently selected day's geocoded activities.
   // Only activities with coordinates become map pins -- un-geocoded entries are excluded.
   useEffect(() => {
