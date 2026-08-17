@@ -81,10 +81,13 @@ function findCurated(destination: string): UnsplashResult | null {
  *  2. Curated map (hardcoded for 20+ popular destinations)
  *  3. Nominatim geocoding to get coordinates for the default image
  */
-export async function fetchDestinationImage(destination: string): Promise<UnsplashResult> {
+export async function fetchDestinationImage(
+  destination: string,
+  signal?: AbortSignal,
+): Promise<UnsplashResult> {
   if (PROXY_URL) {
     try {
-      const res = await fetch(`${PROXY_URL}?destination=${encodeURIComponent(destination)}`)
+      const res = await fetch(`${PROXY_URL}?destination=${encodeURIComponent(destination)}`, { signal })
       if (res.ok) {
         // The proxy returns an already-normalized UnsplashResult so the client never
         // has to know Unsplash's response shape (or hold its credentials).
@@ -92,7 +95,7 @@ export async function fetchDestinationImage(destination: string): Promise<Unspla
         if (result?.url && result?.thumb) {
           // If Unsplash didn't supply coordinates, fall back to Nominatim
           if (!result.lat || !result.lon) {
-            const geo = await geocodePlace(destination)
+            const geo = await geocodePlace(destination, signal)
             if (geo) {
               result.lat = geo.lat
               result.lon = geo.lon
@@ -111,7 +114,7 @@ export async function fetchDestinationImage(destination: string): Promise<Unspla
   if (curated) return curated
 
   // Unknown destination — use generic image but geocode for map centering
-  const geo = await geocodePlace(destination)
+  const geo = await geocodePlace(destination, signal)
   return {
     ...DEFAULT,
     lat: geo?.lat,

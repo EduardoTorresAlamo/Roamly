@@ -66,11 +66,14 @@ export default function AddTripModal({ open, onClose }: AddTripModalProps) {
       }, 0)
       return
     }
+    // Aborts the in-flight fetch (Unsplash proxy + Nominatim) when the destination
+    // changes again or the modal unmounts, so no request outlives its effect.
+    const controller = new AbortController()
     debounceRef.current = setTimeout(async () => {
       const fetchId = ++fetchIdRef.current
       setImageFetching(true)
       try {
-        const result = await fetchDestinationImage(destination.trim())
+        const result = await fetchDestinationImage(destination.trim(), controller.signal)
         // Ignore stale responses: only the latest request may update the preview
         if (fetchIdRef.current !== fetchId) return
         setPreviewImage(result.url)
@@ -79,6 +82,8 @@ export default function AddTripModal({ open, onClose }: AddTripModalProps) {
         setImageLat(result.lat)
         setImageLon(result.lon)
       } catch (err) {
+        // An aborted fetch is expected on cleanup, not an error
+        if (controller.signal.aborted) return
         // A failed preview fetch is non-fatal -- the trip can be created without
         // a cover image -- but it should not surface as an unhandled rejection
         console.error('Destination image fetch failed', err)
@@ -87,8 +92,11 @@ export default function AddTripModal({ open, onClose }: AddTripModalProps) {
       }
     }, 600)
 
-    // Cancel pending timer if the user types again before the delay expires
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+    // Cancel pending timer and abort any in-flight fetch when destination changes
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+      controller.abort()
+    }
   }, [destination])
 
   /** Clears all form fields and image preview state so the modal is clean on next open. */

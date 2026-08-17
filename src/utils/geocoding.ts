@@ -74,9 +74,11 @@ function schedule<T>(task: () => Promise<T>): Promise<T> {
  * request queue, with an in-memory cache so repeated lookups cost nothing.
  *
  * @param query - Human-readable place name, e.g. "Senso-ji Temple, Tokyo"
+ * @param signal - Optional AbortSignal; aborting cancels the in-flight fetch so an
+ *   unmounted caller's request doesn't leak (the result resolves to null, uncached)
  * @returns Coordinates and display name, or null if the query fails or returns no results
  */
-export async function geocodePlace(query: string): Promise<GeoResult | null> {
+export async function geocodePlace(query: string, signal?: AbortSignal): Promise<GeoResult | null> {
   const trimmed = query.trim()
   if (!trimmed) return null
 
@@ -87,11 +89,13 @@ export async function geocodePlace(query: string): Promise<GeoResult | null> {
   return schedule(async () => {
     // Re-check: an identical query may have resolved while this one sat in the queue
     if (cache.has(key)) return cache.get(key) ?? null
+    // The caller may have unmounted while this task waited for its throttle slot
+    if (signal?.aborted) return null
 
     try {
       // limit=1 returns only the best match; accept-language=en ensures English display names
       const url = `${NOMINATIM_BASE}?q=${encodeURIComponent(trimmed)}&format=json&limit=1&accept-language=en`
-      const res = await fetch(url, { headers: HEADERS })
+      const res = await fetch(url, { headers: HEADERS, signal })
       if (!res.ok) {
         // Do not cache 429/5xx -- those are transient and should be retried later
         return null
@@ -127,13 +131,15 @@ export async function geocodePlace(query: string): Promise<GeoResult | null> {
  *
  * @param title - Activity name as entered by the user
  * @param tripDestination - The trip's destination city used to disambiguate the query
+ * @param signal - Optional AbortSignal forwarded to the underlying fetch
  * @returns Coordinates and display name, or null on failure
  */
 export async function geocodeActivity(
   title: string,
   tripDestination: string,
+  signal?: AbortSignal,
 ): Promise<GeoResult | null> {
   // Append destination city to reduce ambiguous geocoding results
   const query = tripDestination ? `${title}, ${tripDestination}` : title
-  return geocodePlace(query)
+  return geocodePlace(query, signal)
 }
