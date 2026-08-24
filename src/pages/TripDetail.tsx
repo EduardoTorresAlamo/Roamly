@@ -71,26 +71,16 @@ export default function TripDetail() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tripId])
 
-  // Reset to day 1 when navigating to a different trip (same component instance),
-  // so selectedDayId never carries over a day id from the previously viewed trip.
-  useEffect(() => {
-    if (trip?.days[0]?.id) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setSelectedDayId(trip.days[0].id)
-    }
-  }, [tripId])
-
-  // Resolve the selected day object; fall back to day 0 if selectedDayId is stale
-  const selectedDay = trip?.days.find((d) => d.id === selectedDayId) ?? trip?.days[0]
-
-  // Reset the orphaned selection when selectedDayId no longer names a day in the
-  // current trip -- e.g. after navigating to a different trip (same component
-  // instance) or after the selected day is removed. Adjusting state during render
-  // (React's recommended pattern over an effect) keeps the raw state in sync with
-  // the fallback above; the guard makes it converge in a single extra render.
-  if (trip && selectedDayId && !trip.days.some((d) => d.id === selectedDayId)) {
-    setSelectedDayId(trip.days[0]?.id ?? '')
-  }
+  // Effective selected day, derived rather than stored: use the user's selection
+  // while it still names a day in this trip, otherwise fall back to the first day.
+  // Deriving means navigating to a different trip (which leaves selectedDayId
+  // pointing at the old trip's day) or deleting the selected day both resolve
+  // correctly with no effect and no render-phase setState -- selectedDayId is only
+  // ever written by an explicit user tab tap.
+  const currentDayId = trip?.days.some((d) => d.id === selectedDayId)
+    ? selectedDayId
+    : (trip?.days[0]?.id ?? '')
+  const selectedDay = trip?.days.find((d) => d.id === currentDayId)
 
   // Sync map markers to the currently selected day's geocoded activities.
   // Only activities with coordinates become map pins -- un-geocoded entries are excluded.
@@ -319,7 +309,7 @@ export default function TripDetail() {
         <div className="flex-shrink-0 px-4 pt-3 pb-3">
           <DayTabs
             days={trip.days}
-            selectedDayId={selectedDay?.id ?? ''}
+            selectedDayId={currentDayId}
             onSelect={setSelectedDayId}
           />
         </div>
