@@ -34,6 +34,17 @@ const cache = new Map<string, { at: number; value: DestinationImage }>()
 // allowance; a token is restored every RATE_REFILL_MS (≈20 requests/minute
 // sustained). Like the cache above, edge instances are not shared, so this bounds
 // abuse per-instance rather than globally.
+//
+// KNOWN LIMITATION: state lives in this Map, in the memory of one edge instance.
+// The platform fans requests out across many short-lived instances, so the real
+// sustained ceiling a determined caller hits is (this limit) × (instance count),
+// and a cold instance always starts a caller at full capacity. This is deliberate
+// for Roamly's current scale — a single access key fronting a low-traffic app —
+// where per-instance bounding plus the origin gate (see handler) is enough to stop
+// casual browser abuse. To enforce a true global limit (multi-region, high traffic,
+// or a paid key with a hard cap), replace `buckets`/`rateLimited` with a shared
+// store such as @upstash/ratelimit backed by Upstash Redis; the call site below is
+// the only integration point that would change.
 const RATE_CAPACITY = 20
 const RATE_REFILL_MS = 3000
 const MAX_BUCKETS = 5000
@@ -146,6 +157,12 @@ function callerOrigin(request: Request): string | null {
 
   const referer = request.headers.get('referer')
   if (referer) return toOrigin(referer)
+
+  // Privacy-hardened browsers may omit Origin and Referer; Sec-Fetch-Site still
+  // identifies a same-origin/same-site request as coming from our own page.
+  const self = toOrigin(request.url)
+  const fetchSite = request.headers.get('sec-fetch-site')
+  if (self && (fetchSite === 'same-origin' || fetchSite === 'same-site')) return self
 
   return null
 }
