@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Plus, Calendar, Upload, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { useTripActions, useTrips } from '@/hooks/useTrips'
 import { useMapState } from '@/hooks/useMapContext'
@@ -132,9 +132,12 @@ export default function Dashboard() {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   const query = search.trim().toLowerCase()
-  const filteredTrips = query
-    ? trips.filter((t) => t.destination.toLowerCase().includes(query))
-    : trips
+  // Recompute the filtered list only when the trips or the query change, not on
+  // every unrelated re-render (e.g. opening a modal or toggling map mode).
+  const filteredTrips = useMemo(
+    () => (query ? trips.filter((t) => t.destination.toLowerCase().includes(query)) : trips),
+    [trips, query],
+  )
 
   const pendingDeleteTrip = trips.find((t) => t.id === pendingDeleteId) ?? null
 

@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Trash2, CalendarDays, ChevronRight } from 'lucide-react'
 import type { Trip } from '@/types'
@@ -43,8 +44,12 @@ interface TripCardProps {
  */
 export default function TripCard({ trip, onDelete }: TripCardProps) {
   const navigate = useNavigate()
-  // Pick a gradient that is stable for this destination name
-  const gradient = GRADIENT_FALLBACKS[hashDestination(trip.destination) % GRADIENT_FALLBACKS.length]
+  // Pick a gradient that is stable for this destination name. Memoized so the
+  // per-character hash reruns only when the destination changes, not on every render.
+  const gradient = useMemo(
+    () => GRADIENT_FALLBACKS[hashDestination(trip.destination) % GRADIENT_FALLBACKS.length],
+    [trip.destination],
+  )
   const duration = getTripDurationDays(trip.startDate, trip.endDate)
   const hasCover = !!trip.coverImageThumb
 
