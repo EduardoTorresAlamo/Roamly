@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Plus, Calendar, Upload, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { useTripActions, useTrips } from '@/hooks/useTrips'
-import { useMapContext } from '@/hooks/useMapContext'
+import { useMapState } from '@/hooks/useMapContext'
 import TripGrid from '@/components/dashboard/TripGrid'
 import AddTripModal from '@/components/modals/AddTripModal'
 import CalendarImportModal from '@/components/modals/CalendarImportModal'
@@ -123,7 +123,7 @@ function PhotoGalleryWidget({ trips }: { trips: { coverImageThumb?: string; dest
 export default function Dashboard() {
   const trips = useTrips()
   const { deleteTrip } = useTripActions()
-  const { mapExpanded } = useMapContext()
+  const { mapExpanded } = useMapState()
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [importModalOpen, setImportModalOpen] = useState(false)
   // Case-insensitive destination search over the trip list

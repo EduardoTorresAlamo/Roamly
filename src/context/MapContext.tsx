@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, type ReactNode } from 'react'
 import type { ActivityType } from '@/types'
 import type { POI } from '@/utils/overpass'
-import { MapContext } from '@/hooks/useMapContext'
+import { MapStateContext, MapDispatchContext, MapPOIContext } from '@/hooks/useMapContext'
 import { usePOIService } from '@/hooks/usePOIService'
 
 /**
@@ -31,25 +31,29 @@ export interface FlyToTarget {
 }
 
 /**
- * Public API surface of MapContext.
+ * Frequently-changing map state slice.
  *
- * MapContext bridges the Leaflet map layer and the React UI: it holds marker
- * positions derived from trip data and orchestrates flyTo animations and
- * Overpass POI fetching when a marker is focused.
+ * Consumers of this (Leaflet marker layer, panels that react to focus/expand) are
+ * re-rendered when any of these change, so keep it to genuinely reactive values.
  */
-export interface MapContextValue {
+export interface MapStateValue {
   /** Current set of activity pins derived from the selected day's activities */
   markers: MapMarker[]
   /** Id of the marker that is currently highlighted, or null */
   focusedMarkerId: string | null
-  /** Nearby POIs fetched from Overpass when a marker is focused */
-  recommendations: POI[]
-  /** True while the Overpass fetch is in flight */
-  isLoadingRecs: boolean
   /** Target for the next Leaflet flyTo animation; consumed by ActivityMarkers */
   flyToTarget: FlyToTarget | null
   /** Whether the map is in full-view mode (content panel collapsed to bottom sheet) */
   mapExpanded: boolean
+}
+
+/**
+ * Stable map action callbacks.
+ *
+ * Every function here is reference-stable for the provider's lifetime, so a
+ * component that only dispatches (never reads state) never re-renders.
+ */
+export interface MapDispatchValue {
   setMapExpanded: (v: boolean) => void
   /** Replace all markers; called when the selected day tab changes */
   setMarkers: (markers: MapMarker[]) => void
@@ -59,6 +63,16 @@ export interface MapContextValue {
   clearFocus: () => void
   /** Animate the map to arbitrary coordinates, e.g. the trip destination on page load */
   flyTo: (lat: number, lon: number, zoom?: number) => void
+}
+
+/**
+ * Nearby-POI slice, which arrives asynchronously and independently of map state.
+ */
+export interface MapPOIValue {
+  /** Nearby POIs fetched from Overpass when a marker is focused */
+  recommendations: POI[]
+  /** True while the Overpass fetch is in flight */
+  isLoadingRecs: boolean
 }
 
 /**
@@ -109,23 +123,35 @@ export function MapProvider({ children }: { children: ReactNode }) {
     setFlyToTarget({ lat, lon, zoom })
   }, [])
 
-  const value = useMemo(() => ({
+  const stateValue = useMemo<MapStateValue>(() => ({
     markers,
     focusedMarkerId,
-    recommendations,
-    isLoadingRecs,
     flyToTarget,
     mapExpanded,
+  }), [markers, focusedMarkerId, flyToTarget, mapExpanded])
+
+  // All callbacks are stable, so this object is created once and never changes
+  // identity -- dispatch-only consumers therefore never re-render.
+  const dispatchValue = useMemo<MapDispatchValue>(() => ({
     setMapExpanded,
     setMarkers,
     focusMarker,
     clearFocus,
     flyTo,
-  }), [markers, focusedMarkerId, recommendations, isLoadingRecs, flyToTarget, mapExpanded, setMapExpanded, setMarkers, focusMarker, clearFocus, flyTo])
+  }), [setMapExpanded, setMarkers, focusMarker, clearFocus, flyTo])
+
+  const poiValue = useMemo<MapPOIValue>(() => ({
+    recommendations,
+    isLoadingRecs,
+  }), [recommendations, isLoadingRecs])
 
   return (
-    <MapContext.Provider value={value}>
-      {children}
-    </MapContext.Provider>
+    <MapDispatchContext.Provider value={dispatchValue}>
+      <MapStateContext.Provider value={stateValue}>
+        <MapPOIContext.Provider value={poiValue}>
+          {children}
+        </MapPOIContext.Provider>
+      </MapStateContext.Provider>
+    </MapDispatchContext.Provider>
   )
 }

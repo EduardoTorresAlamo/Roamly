@@ -1,5 +1,5 @@
 import { X, Utensils, Coffee, Beer, Landmark, BedDouble, TreePine, Star, MapPin, Loader2 } from 'lucide-react'
-import { useMapContext } from '@/hooks/useMapContext'
+import { useMapState, useMapDispatch, useMapPOI } from '@/hooks/useMapContext'
 import type { POI } from '@/utils/overpass'
 
 /**
@@ -50,7 +50,9 @@ function distanceLabel(m: number) {
  * or a fetch is in progress. It dismisses via the X button or when clearFocus is called.
  */
 export default function NearbyPanel() {
-  const { focusedMarkerId, markers, recommendations, isLoadingRecs, clearFocus } = useMapContext()
+  const { focusedMarkerId, markers } = useMapState()
+  const { recommendations, isLoadingRecs } = useMapPOI()
+  const { clearFocus } = useMapDispatch()
 
   if (!focusedMarkerId) return null
 

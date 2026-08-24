@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Plane, Map, X } from 'lucide-react'
 import MapBackground from './MapBackground'
 import { useTrips } from '@/hooks/useTrips'
-import { useMapContext } from '@/hooks/useMapContext'
+import { useMapState, useMapDispatch } from '@/hooks/useMapContext'
 import { cn } from '@/lib/utils'
 
 /**
@@ -21,7 +21,8 @@ interface AppShellProps {
  * The map toggle is mirrored in TripDetail's content panel for discoverability.
  */
 function MacOSMenuBar() {
-  const { mapExpanded, setMapExpanded } = useMapContext()
+  const { mapExpanded } = useMapState()
+  const { setMapExpanded } = useMapDispatch()
 
   return (
     <div className="macos-bar h-12 flex items-center px-4 sm:px-6 gap-4 fixed top-0 left-0 right-0 z-50">
@@ -77,7 +78,7 @@ function MacOSMenuBar() {
  */
 function MapCenterOnLoad() {
   const trips = useTrips()
-  const { flyTo } = useMapContext()
+  const { flyTo } = useMapDispatch()
 
   useEffect(() => {
     const first = trips[0]

@@ -2,7 +2,7 @@ import { type ReactNode } from 'react'
 import { MapContainer, TileLayer } from 'react-leaflet'
 import ActivityMarkers from '@/components/map/ActivityMarkers'
 import NearbyPanel from '@/components/map/NearbyPanel'
-import { useMapContext } from '@/hooks/useMapContext'
+import { useMapState } from '@/hooks/useMapContext'
 
 /**
  * Props accepted by the MapBackground layout component.
@@ -29,7 +29,7 @@ interface MapBackgroundProps {
  * @param children - App content to render above the map
  */
 export default function MapBackground({ children }: MapBackgroundProps) {
-  const { mapExpanded } = useMapContext()
+  const { mapExpanded } = useMapState()
 
   return (
     <div className="fixed inset-0 w-screen h-screen">

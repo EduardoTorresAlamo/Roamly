@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Sparkles } from 'lucide-react'
 import type { DayPlan } from '@/types'
 import ActivityItem from './ActivityItem'
-import { useMapContext } from '@/hooks/useMapContext'
+import { useMapDispatch } from '@/hooks/useMapContext'
 
 interface ActivityTimelineProps {
   day: DayPlan
@@ -26,7 +26,7 @@ interface ActivityTimelineProps {
  * @param onMoveActivity - Callback invoked with (fromIndex, toIndex) when a row is dropped
  */
 export default function ActivityTimeline({ day, onDeleteActivity, onMoveActivity }: ActivityTimelineProps) {
-  const { focusMarker } = useMapContext()
+  const { focusMarker } = useMapDispatch()
   // Index of the row currently being dragged, or null when no drag is in progress
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   // Index of the row currently hovered as a drop target (drives the drop indicator)

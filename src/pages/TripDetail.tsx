@@ -5,7 +5,7 @@ import { useTripActions, useTripById } from '@/hooks/useTrips'
 import { formatDateRange, getTripDurationDays } from '@/utils/dates'
 import { downloadTripICS } from '@/utils/icsExport'
 import { generateItineraryMarkdown } from '@/utils/itineraryMarkdown'
-import { useMapContext } from '@/hooks/useMapContext'
+import { useMapState, useMapDispatch } from '@/hooks/useMapContext'
 import DayTabs from '@/components/trip/DayTabs'
 import ActivityTimeline from '@/components/trip/ActivityTimeline'
 import AddActivityModal from '@/components/modals/AddActivityModal'
@@ -30,7 +30,8 @@ import { cn } from '@/lib/utils'
 export default function TripDetail() {
   const { tripId } = useParams<{ tripId: string }>()
   const { addActivity, deleteActivity, moveActivity } = useTripActions()
-  const { setMarkers, flyTo, clearFocus, mapExpanded, setMapExpanded } = useMapContext()
+  const { mapExpanded } = useMapState()
+  const { setMarkers, flyTo, clearFocus, setMapExpanded } = useMapDispatch()
   const trip = useTripById(tripId ?? '')
 
   // Default to day 1 on initial render; lazy initializer avoids an extra render cycle
@@ -68,6 +69,15 @@ export default function TripDetail() {
     clearFocus()
     setMapExpanded(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tripId])
+
+  // Reset to day 1 when navigating to a different trip (same component instance),
+  // so selectedDayId never carries over a day id from the previously viewed trip.
+  useEffect(() => {
+    if (trip?.days[0]?.id) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelectedDayId(trip.days[0].id)
+    }
   }, [tripId])
 
   // Resolve the selected day object; fall back to day 0 if selectedDayId is stale

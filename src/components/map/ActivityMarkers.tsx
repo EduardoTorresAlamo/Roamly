@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useMap } from 'react-leaflet'
 import L from 'leaflet'
-import { useMapContext } from '@/hooks/useMapContext'
+import { useMapState, useMapDispatch } from '@/hooks/useMapContext'
 import type { ActivityType } from '@/types'
 
 // CSS hex colors keyed by activity type; used inside inline SVGs where Tailwind classes cannot be applied
@@ -75,7 +75,8 @@ function makeIcon(type: ActivityType, focused: boolean) {
  */
 export default function ActivityMarkers() {
   const map = useMap()
-  const { markers, focusedMarkerId, flyToTarget, focusMarker } = useMapContext()
+  const { markers, focusedMarkerId, flyToTarget } = useMapState()
+  const { focusMarker } = useMapDispatch()
 
   // Cache of live Leaflet marker instances, keyed by marker id, kept alive across
   // focus changes so we never destroy/recreate the whole set.
@@ -83,13 +84,16 @@ export default function ActivityMarkers() {
   // Latest focusMarker callback, read via ref so the marker-list effect below does
   // not depend on its identity (which would rebuild every marker if it changed).
   const focusMarkerRef = useRef(focusMarker)
-  focusMarkerRef.current = focusMarker
   // Latest focused id, read during marker creation without listing it as a dep of
   // the marker-list effect (focus styling is applied by the dedicated effect).
   const focusedIdRef = useRef(focusedMarkerId)
-  focusedIdRef.current = focusedMarkerId
   // Previously-focused id so the focus effect knows which marker to un-focus.
   const prevFocusedRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    focusMarkerRef.current = focusMarker
+    focusedIdRef.current = focusedMarkerId
+  })
 
   // Respond to flyToTarget changes set by MapContext.focusMarker and MapContext.flyTo
   useEffect(() => {
