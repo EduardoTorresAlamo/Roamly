@@ -1,96 +1,61 @@
-# 🏗️ Reporte de Auditoría de Arquitectura — Roamly
+# 🏗️ Reporte Completo de Auditoría de Arquitectura — Roamly
 
-**Módulo:** Arquitectura de Software, Modelado de Datos, Patrones de Diseño, Manejo de Tiempo y Accesibilidad  
-**Fecha:** 7 de Agosto de 2026  
-**Auditor:** Code Reviewer & Security Auditor Agent (`code-reviewer-auditor`)
-
----
-
-## 🎯 Resumen de Hallazgos de Arquitectura
-
-| ID | Severidad | Título / Área | Archivo Afectado | Estado |
-| :--- | :---: | :--- | :--- | :---: |
-| **ARC-01** | 🔴 CRÍTICO | Bug de Zona Horaria UTC en Generación de Días | [`src/utils/dates.ts`](file:///Users/eduardotorres/Developer/Roamly/src/utils/dates.ts) | **RESUELTO ✅ (Date.UTC)** |
-| **ARC-02** | 🟠 ALTO | Incompatibilidad de Drag & Drop en Pantallas Táctiles | [`src/components/trip/ActivityItem.tsx`](file:///Users/eduardotorres/Developer/Roamly/src/components/trip/ActivityItem.tsx) | **RESUELTO ✅ (Touch Drag)** |
-| **ARC-03** | 🟠 ALTO | Acoplamiento Directo de Capa de Datos a `localStorage` | [`src/repository/TripRepository.ts`](file:///Users/eduardotorres/Developer/Roamly/src/repository/TripRepository.ts) | **RESUELTO ✅ (Repository Pattern)** |
-| **ARC-04** | 🟡 MEDIO | Mezcla de Responsabilidades en `MapContext` | [`src/context/MapContext.tsx`](file:///Users/eduardotorres/Developer/Roamly/src/context/MapContext.tsx) | PENDIENTE |
+**Módulo:** Arquitectura de Software, Patrones de Diseño, Desacoplamiento, Manejo de Estado y React 19  
+**Fecha de Auditoría:** 24 de Agosto de 2026  
+**Auditor:** Agentic AI Code Reviewer & Software Architect  
+**Repositorio:** [`Roamly`](file:///Users/eduardotorres/Developer/Roamly)
 
 ---
 
-## 🏗️ Análisis Detallado de Arquitectura e Integración Reciente
+## 🎯 Resumen Ejecutivo de Arquitectura
 
-### ARC-03: Implementación del Patrón Repository (`TripRepository`) (🟠 ALTO — RESUELTO ✅)
+El diseño arquitectónico de **Roamly** destaca por una clara separación de responsabilidades:
+- **Patrón Repositorio (`TripRepository`)**: Aísla la persistencia de datos de los componentes React.
+- **División de Contextos (`TripStateContext` vs `TripDispatchContext`)**: Garantiza estabilidad referencial en mutaciones.
+- **Manejo de Fechas Anclado en UTC (`dates.ts`)**: Previene desfases de fecha y problemas de DST.
+- **Servicios Aislados (`usePOIService`)**: Gestiona debouncing y descarte de respuestas desordenadas en Overpass API.
 
-#### Diagnóstico Previo
-Previamente, `TripContext.tsx` dependía rígidamente del hook custom `useLocalStorage`, mezclando la gestión de estado de React con llamadas directas a la API global `window.localStorage`. Esto impedía inyectar fuentes de datos alternativas (ej. IndexedDB, in-memory para tests, Supabase) y dificultaba las pruebas unitarias aisladas.
-
-#### Estado Actual e Integración Verificada
-✅ **Resuelto**. Se creó una abstracción de persistencia completa y limpia dividida en dos componentes principales:
-
-1. **Contrato de Interfaz (`TripRepository.ts`):**
-   ```typescript
-   export interface TripRepository {
-     getAll(): Trip[]
-     getById(id: string): Trip | undefined
-     save(trip: Trip): void
-     delete(id: string): void
-   }
-   ```
-2. **Implementación concreta `LocalStorageTripRepository`:**
-   - Cumple estrictamente con la regla `erasableSyntaxOnly` de TypeScript (campos declarados explícitamente sin propiedades de parámetro de constructor).
-   - Maneja fallos suaves (`try/catch`) en lectura y escritura contra `Storage` configurable (por defecto `window.localStorage`).
-   - Implementa `save` como una operación de *upsert* idempotente que preserva el orden de inserción.
-
-3. **Inyección de Dependencias vía `TripRepositoryProvider.tsx` y `TripContext.tsx`:**
-   - `TripRepositoryProvider` memoriza el repositorio utilizando `useMemo`.
-   - `TripProvider` acepta opcionalmente un `repository` por props o lo obtiene de `useTripRepository()`, sembrando el estado inicial mediante `useState(() => repo.getAll())`.
-   - Mutaciones (`addTrip`, `addTripFull`, `deleteTrip`, `addActivity`, `deleteActivity`, `moveActivity`) invocan métodos idempotentes del repositorio (`repo.save` / `repo.delete` / `persistTrip`) dentro de actualizadores de estado funcionales.
-
-4. **Jerarquía de Providers en `src/main.tsx`:**
-   ```tsx
-   <StrictMode>
-     <BrowserRouter>
-       <TripRepositoryProvider>
-         <TripProvider>
-           <MapProvider>
-             <App />
-           </MapProvider>
-         </TripProvider>
-       </TripRepositoryProvider>
-     </BrowserRouter>
-   </StrictMode>
-   ```
-   La jerarquía respeta estrictamente las dependencias: `TripRepositoryProvider` provee el backend de datos que consume `TripProvider`.
+Sin embargo, se identifican oportunidades clave de desacoplamiento en **`MapContext`** y en la **interfaz del repositorio**.
 
 ---
 
-### ARC-01: Corrección Definitiva del Bug de Zona Horaria (🔴 CRÍTICO — RESUELTO ✅)
+## 📊 Matriz de Hallazgos de Arquitectura por Severidad
 
-#### Diagnóstico y Demostración
-✅ **Resuelto**. [`src/utils/dates.ts`](file:///Users/eduardotorres/Developer/Roamly/src/utils/dates.ts#L15-L55) desacopló la manipulación de fechas del huso local mediante funciones dedicadas en tiempo UTC estricto:
-```typescript
-function parseISODate(isoDate: string): Date {
-  const [year, month, day] = isoDate.split('-').map(Number)
-  return new Date(Date.UTC(year, month - 1, day))
-}
-
-function toISODate(date: Date): string {
-  return date.toISOString().slice(0, 10)
-}
-```
-Todas las fechas de los itinerarios son inmutables independientemente de la ubicación geográfica del usuario.
+| ID | Severidad | Área / Componente | Archivo Afectado | Descripción Corta | Estado |
+| :--- | :---: | :--- | :--- | :--- | :---: |
+| **ARCH-01** | 🟠 HIGH | Monolito de Contexto | [`MapContext.tsx:L40-L130`](file:///Users/eduardotorres/Developer/Roamly/src/context/MapContext.tsx#L40-L130) | `MapContext` monolítico fuerza re-renders innecesarios en `AppShell` y `Dashboard` | ⚠️ IDENTIFICADO |
+| **ARCH-02** | 🟡 MEDIUM | Persistencia Sincrónica | [`TripRepository.ts:L13-L22`](file:///Users/eduardotorres/Developer/Roamly/src/repository/TripRepository.ts#L13-L22) | Métodos síncronos en interfaz `TripRepository` dificultan migración a bases de datos asíncronas | ⚠️ IDENTIFICADO |
+| **ARCH-03** | 🟡 MEDIUM | Acoplamiento en Modales | [`AddTripModal.tsx`, `CalendarImportModal.tsx`](file:///Users/eduardotorres/Developer/Roamly/src/components/modals/) | Orquestación de red, geocodificación y parsing dentro de componentes UI | ⚠️ IDENTIFICADO |
+| **ARCH-04** | 🟢 LOW | Convivencia Tailwind v3/v4 | [`package.json` vs `landing/package.json`](file:///Users/eduardotorres/Developer/Roamly/package.json) | Monorepo con dos versiones y sistemas de configuración de Tailwind diferentes | ⚠️ IDENTIFICADO |
+| **ARCH-05** | 🟢 LOW | Consistencia UTC | [`dates.ts:L15-L55`](file:///Users/eduardotorres/Developer/Roamly/src/utils/dates.ts#L15-L55) | Operaciones de fecha ancladas 100% en UTC | **RESUELTO ✅** |
+| **ARCH-06** | 🟢 LOW | Split de Trip Context | [`useTrips.ts:L11-L26`](file:///Users/eduardotorres/Developer/Roamly/src/hooks/useTrips.ts#L11-L26) | Segregación de State y Dispatch para mutaciones eficientes | **RESUELTO ✅** |
 
 ---
 
-### ARC-02: Soporte Multidispositivo para Reordenamiento Drag & Drop (🟠 ALTO — RESUELTO ✅)
+## 🔍 Análisis Detallado de Decisiones Arquitectónicas
 
-#### Diagnóstico y Estado Actual
-✅ **Resuelto**. [`src/components/trip/ActivityItem.tsx`](file:///Users/eduardotorres/Developer/Roamly/src/components/trip/ActivityItem.tsx#L76-L157) incorpora un controlador de gestos táctiles síncrono sobre el tirador de arrastre (`GripVertical`), resolviendo el elemento subyacente mediante `document.elementFromPoint`, permitiendo reordenar actividades fluidamente en móviles.
+### 1. 🟠 HIGH: ARCH-01 — Monolito de Estado en `MapContext`
+- **Problema:** `MapContext` expone un único contexto que mezcla propiedades de UI (`mapExpanded`), pins del mapa (`markers`), objetivo de vuelo (`flyToTarget`), y resultados de búsqueda de POIs de Overpass (`recommendations`, `isLoadingRecs`).
+- **Consecuencia:** Cuando el usuario interactúa con un marcador de actividad en el mapa y se dispara `searchNearbyPOIs`, el cambio en `isLoadingRecs` y `recommendations` genera un nuevo objeto `value` en `MapContext.Provider`. Esto provoca el re-renderizado de `MacOSMenuBar`, `AppShell` y `Dashboard`, a pesar de que estos componentes no consumen recomendaciones POI.
+- **Solución Recomendada:** Dividir `MapContext` en sub-contextos o mover las recomendaciones POI al componente `NearbyPanel` mediante el hook `usePOIService`.
 
 ---
 
-### ARC-04: Separación de Funcionalidades en `MapContext` (🟡 MEDIO — PENDIENTE)
+### 2. 🟡 MEDIUM: ARCH-02 — Interfaz Síncrona en `TripRepository`
+- **Problema:** La interfaz `TripRepository` actual declara:
+  ```typescript
+  export interface TripRepository {
+    getAll(): Trip[]
+    getById(id: string): Trip | undefined
+    save(trip: Trip): void
+    delete(id: string): void
+  }
+  ```
+- **Consecuencia:** Aunque funciona de forma directa para `localStorage`, cualquier backend remoto (Supabase, Firebase, Cloudflare D1) o motor asíncrono cliente (IndexedDB / OPFS SQLite) requerirá que estos métodos devuelvan `Promise<Trip[]>`, `Promise<void>`, etc.
+- **Solución Recomendada:** Extender o migrar la abstracción a una interfaz `AsyncTripRepository` con soporte para React 19 `use()` o React Query / SWR.
 
-#### Diagnóstico
-[`src/context/MapContext.tsx`](file:///Users/eduardotorres/Developer/Roamly/src/context/MapContext.tsx) acopla la gestión del estado visual del mapa con llamadas de red directas a la API de Overpass (`fetchNearbyPOIs`).
-- **Remediación Recomendada:** Extraer las consultas de Overpass a un hook custom `usePOIService`.
+---
+
+### 3. 🟡 MEDIUM: ARCH-03 — Densidad de Lógica en Modales de Entrada de Datos
+- **Problema:** `AddTripModal.tsx` (~260 líneas) y `CalendarImportModal.tsx` (~390 líneas) contienen lógica de abort controllers, debounce timers, llamadas de geocodificación y mapeo de formatos ICS mezclados con JSX de Radix UI.
+- **Solución Recomendada:** Extraer custom hooks especializados (`useTripForm`, `useCalendarImport`) para aislar la lógica de presentación del flujo de datos asíncrono.

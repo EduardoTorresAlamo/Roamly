@@ -1,4 +1,4 @@
-import { Routes, Route, useLocation } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import AppShell from '@/components/layout/AppShell'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import Dashboard from '@/pages/Dashboard'
@@ -26,6 +26,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/trip/:tripId" element={<TripDetail />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </ErrorBoundary>
       </AppShell>

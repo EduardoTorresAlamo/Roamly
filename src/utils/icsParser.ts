@@ -270,15 +270,16 @@ function sanitizeDescription(desc: string): string {
  * @returns A typed ICSEvent, or null if the event lacks a SUMMARY (invalid)
  */
 function buildEvent(props: Record<string, string>): ICSEvent | null {
-  const summary = props['SUMMARY']
+  const rawSummary = props['SUMMARY']
   // Events without a summary are invalid and cannot be displayed meaningfully
-  if (!summary) return null
+  if (!rawSummary) return null
+  const summary = sanitizeDescription(rawSummary)
 
   const uid = props['UID'] ?? `${Date.now()}-${Math.random()}`
   const dtStart = icsDateToISO(props['DTSTART'] ?? '')
   const dtEnd = icsDateToISO(props['DTEND'] ?? '')
   const type = detectEventType(props)
-  const location = props['LOCATION']
+  const location = props['LOCATION'] ? sanitizeDescription(props['LOCATION']) : undefined
   const description = props['DESCRIPTION']
 
   // Only attempt flight number extraction for events already classified as flights

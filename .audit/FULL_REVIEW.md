@@ -1,145 +1,83 @@
-# 📋 Roamly — Full Review & Technical Audit Report
+# 🔍 FULL REVIEW — Resumen Ejecutivo de Auditoría de Roamly
 
-**Proyecto:** Roamly (`/Users/eduardotorres/Developer/Roamly`)  
-**Fecha:** 7 de Agosto de 2026  
-**Auditor:** Agentic AI Code Reviewer & Systems Architect  
-**Estado General:** 🟢 **Sólido y listo para producción MVP (9.3 / 10)**
-
----
-
-## 📑 Tabla de Contenidos
-1. [🔒 1. Security Issues (Problemas de Seguridad)](#-1-security-issues-problemas-de-seguridad)
-2. [💡 2. Nice-to-haves (Nuevas Funcionalidades Sugeridas)](#-2-nice-to-haves-nuevas-funcionalidades-sugeridas)
-3. [🚀 3. Future Work (Tech Debt, Refactors y Hoja de Ruta)](#-3-future-work-tech-debt-refactors-y-hoja-de-ruta)
-4. [📊 Resumen Ejecutivo y Conclusión](#-resumen-ejecutivo-y-conclusión)
+**Proyecto:** Roamly (`~/Developer/Roamly`)  
+**Stack:** React 19.2, TypeScript 6.0, Vite 8, Tailwind CSS v3/v4, Leaflet / React-Leaflet, Radix UI, Astro 7 (Landing)  
+**Fecha:** 24 de Agosto de 2026  
+**Alcance (Scope):** Código Fuente Completo (`src/`, `api/`, `landing/`, tooling y pruebas)  
+**Severidad Real:** `CRITICAL` | `HIGH` | `MEDIUM` | `LOW`  
 
 ---
 
-## 🔒 1. Security Issues (Problemas de Seguridad)
+## 📊 Matriz Consolidada de Severidades
 
-### 🔴 Hallazgos Pendientes y Riesgos Detectados
-
-#### 1.1. Sanitización de Inyección Markdown / HTML en Exportación e Importación ICS
-- **Ubicación:** `src/utils/icsParser.ts` y `src/pages/TripDetail.tsx` (`generateItineraryMarkdown`)
-- **Descripción:** Aunque `sanitizeDescription` remueve etiquetas HTML básicas e hipervínculos `javascript:`, al generar la exportación en Markdown o clipboard en `TripDetail.tsx`, las notas y títulos cargados manualmente o mediante archivos `.ics` externos se concatenan directamente.
-- **Riesgo:** Si un usuario importa un calendario `.ics` malicioso proveniente de un tercero o sincronización externa con descripciones formateadas que contengan payloads de markdown malicioso, HTML incrustado o enlaces con esquemas no estándar (`data:text/html`), podría ejecutarse o desconfigurar visores de Markdown externos al compartir itinerarios.
-- **Remediación:**
-  - Aplicar `DOMPurify` o una librería de sanitización estricta antes de renderizar Markdown o generar exportaciones de texto plano.
-  - Escapar explícitamente caracteres de control de Markdown (`[`, `]`, `(`, `)`, `*`, `_`) en campos introducidos por el usuario como `title` y `notes`.
-
-#### 1.2. Falta de Restricción de Origen (CORS) y Rate Limiting en Edge Proxy de Unsplash
-- **Ubicación:** `api/unsplash.ts`
-- **Descripción:** La función Edge Proxy enmascara adecuadamente la clave `UNSPLASH_ACCESS_KEY` para que no se filtre en el bundle de cliente en el navegador. Sin embargo, no valida el encabezado `Origin` o `Referer` de las peticiones entrantes.
-- **Riesgo:** Cualquier atacante que descubra la URL del endpoint proxy (`/api/unsplash`) podría utilizar la API Key del proyecto de manera arbitraria desde orígenes externos, consumiendo la cuota mensual de peticiones de Unsplash.
-- **Remediación:**
-  - Verificar el encabezado `Origin` en `api/unsplash.ts` para permitir únicamente peticiones originadas desde el dominio oficial de Roamly (`https://roamly.app` o subdominios autorizados).
-  - Implementar rate-limiting por IP en la capa Vercel / Netlify Edge functions.
-
-#### 1.3. Integridad y Validación de Esquemas en Persistencia Local (`localStorage`)
-- **Ubicación:** `src/repository/TripRepository.ts`
-- **Descripción:** La clase `LocalStorageTripRepository` atrapa excepciones de `JSON.parse` mediante un bloque `try/catch` para evitar fallos catastróficos. Sin embargo, no valida que los objetos recuperados cumplan con la estructura exacta de la interfaz `Trip` mediante una validación de esquemas en tiempo de ejecución (p. ej. con `Zod`).
-- **Riesgo:** Si una versión anterior de los datos almacenados en el navegador del usuario carece de ciertas propiedades obligatorias (como `days`, `activities` o `lat`/`lon`), la aplicación puede sufrir un runtime crash (`TypeError: undefined is not iterable`) al renderizar la UI.
-- **Remediación:**
-  - Utilizar `zod` para parsear y validar el objeto `Trip` deserializado desde `localStorage`.
-  - Aplicar una función de migración de esquema si los datos guardados corresponden a una versión obsoleta.
-
-#### 1.4. Política de Contenido y Sanitización en Nominatim / Leaflet Maps
-- **Ubicación:** `src/utils/geocoding.ts`
-- **Descripción:** Se incluye la cabecera `User-Agent: RoamlyTravelApp/1.0` requerida por las políticas de OpenStreetMap/Nominatim. Sin embargo, las cadenas de respuesta de búsqueda de lugares se insertan directamente en el Popup del mapa sin codificación HTML cuando Leaflet las procesa.
-- **Remediación:** Asegurar que todos los strings insertados en popups de Leaflet (`L.popup().setContent(...)`) utilicen `textContent` o pasen por sanitización de entidades HTML.
+| Dimensión Evaluada | CRITICAL 🔴 | HIGH 🟠 | MEDIUM 🟡 | LOW 🟢 | Total | Estado General |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| 1. 🔒 **Seguridad** | 0 | 1 | 2 | 2 | **5** | 🟡 Revisión |
+| 2. 🐛 **Bugs y Lógica** | 0 | 0 | 3 | 2 | **5** | 🟢 Estable |
+| 3. 📐 **Arquitectura** | 0 | 1 | 2 | 1 | **4** | 🟡 Revisión |
+| 4. ⚡ **Rendimiento** | 0 | 0 | 1 | 2 | **3** | 🟢 Óptimo |
+| 5. 🧹 **Dead Code / Smells** | 0 | 0 | 0 | 3 | **3** | 🟢 Bueno |
+| 6. 🗄️ **Schema / Persistencia** | 0 | 1 | 1 | 1 | **3** | 🟡 Revisión |
+| **TOTAL CONSOLIDADO** | **0** | **3** | **9** | **11** | **23** | 🟡 **SALUDABLE CON MEJORAS** |
 
 ---
 
-## 💡 2. Nice-to-haves (Nuevas Funcionalidades Sugeridas)
+## 🚦 Línea Base de Estado del Proyecto
 
-### 🌟 Funcionalidades para Elevar la Experiencia del Usuario (UX/DX)
-
-1. **✈️ Exportación Directa a Calendario (.ics / Google Calendar)**
-   - *Actualmente:* Roamly puede **importar** archivos `.ics`.
-   - *Mejora:* Permitir **exportar** el itinerario completo a un archivo `.ics` descargable o generar un enlace `https://calendar.google.com/render?action=TEMPLATE...` para sincronizar las actividades directamente con la agenda del usuario.
-
-2. **💰 Módulo de Presupuesto y Gastos (Trip Expense Tracker)**
-   - Añadir una pestaña o modal para ingresar costos asociados a cada actividad (vuelos, hospedaje, comida, entradas).
-   - Desglose por categoría (Transporte, Alojamiento, Comida, Entretenimiento) y gráfico resumen de gastos vs. presupuesto total planeado.
-   - Soporte para múltiples divisas con conversión automática (USD, EUR, GBP, JPY, CLP, etc.).
-
-3. **🗺️ Cálculo de Rutas e Itinerario Visual en Mapa (Routing Machine)**
-   - Integrar un servicio de ruteo como OSRM (Open Source Routing Machine) o Mapbox Directions para trazar líneas de ruta caminables o en vehículo entre las actividades consecutivas del mismo día.
-   - Mostrar estimación de tiempo de viaje y distancia a pie/auto entre el punto A y el punto B.
-
-4. **🧳 Lista de Equipaje / Checklist de Viaje (Packing List & To-Do)**
-   - Pestaña de lista de verificación interactiva por viaje (documentos, adaptadores de enchufe, ropa, medicamentos) con plantillas prediseñadas según el destino o clima.
-
-5. **☀️ Integración de Pronóstico del Tiempo (Weather Widget)**
-   - Mostrar el clima estimado (temperatura y estado del tiempo) en las pestañas de cada día (`DayTabs`) consultando una API pública como Open-Meteo (sin API key requerida).
-
-6. **📲 Soporte PWA (Progressive Web App) y Modo Offline Avanzado**
-   - Configurar `vite-plugin-pwa` con un Service Worker que instale la app en pantallas de inicio de iOS/Android y almacene en caché las baldosas (*tiles*) del mapa previamente visitadas para uso en vuelos o lugares sin conexión a internet.
-
-7. **👥 Colaboración y Compartición en Tiempo Real (vía Supabase)**
-   - Permitir generar un enlace único de lectura ("Share Trip") o edición colaborativa en tiempo real sincronizando las mutaciones del contexto con una tabla `trips` en Supabase backend.
+- **Pruebas Automatizadas (`vitest run`):** 🟢 **58/58 passed (100%)** en 5 suites (`dates`, `geocoding`, `icsExport`, `icsParser`, `repository`).
+- **Linter (`eslint .`):** 🟡 **1 warning** (`react-hooks/exhaustive-deps` en [`src/pages/TripDetail.tsx:L80`](file:///Users/eduardotorres/Developer/Roamly/src/pages/TripDetail.tsx#L80)).
+- **Compilador TypeScript (`tsc -b`):** 🟢 **0 errores de tipos** en modo estricto.
+- **Build de Producción (`vite build` + `astro build`):** 🟢 **Compilación exitosa** tanto para la SPA como para la Landing en Astro.
 
 ---
 
-## 🚀 3. Future Work (Tech Debt, Refactors y Hoja de Ruta)
+## 🎯 Hallazgos de Alta Prioridad (HIGH 🟠)
 
-### 🧹 Deuda Técnica y Refactorizaciones Recomendadas
+### 🟠 [HIGH] SEC-01: Rate Limiter y Caché en Memoria Volátil en Proxy Edge
+- **Ubicación:** [`api/unsplash.ts:L37-L70, L246-L256`](file:///Users/eduardotorres/Developer/Roamly/api/unsplash.ts#L37-L70)
+- **Problema:** Los contadores de *token bucket* (`buckets`) y la caché (`cache`) residen en memoria dentro del worker isolate. En plataformas Edge (Vercel Edge / Cloudflare Workers / Netlify), las instancias son efímeras y no comparten memoria entre regiones. Un atacante puede distribuir peticiones entre nodos para eludir el límite de 20 req/min y agotar la cuota upstream de `UNSPLASH_ACCESS_KEY`.
+- **Acción:** Conectar un almacén distribuido para control de tasa (ej. Upstash Redis / Vercel KV / Cloudflare Rate Limiting).
 
-#### 3.1. Modularización del Componente `TripDetail.tsx`
-- **Problema:** `TripDetail.tsx` concentra múltiples responsabilidades en ~364 líneas de código: exportación a markdown, sincronización del mapa con Leaflet, gestión de días seleccionados, manejo de modales y estados de confirmación.
-- **Refactor Recomendado:**
-  - Extraer la lógica de exportación a un hook dedicado `useExportItinerary(trip)`.
-  - Separar la vista en sub-componentes: `TripHeader.tsx`, `TripMapSheet.tsx`, `ItineraryMarkdownExporter.tsx`.
+### 🟠 [HIGH] ARCH-01: Re-renders Innecesarios por Monolito de Estado en `MapContext`
+- **Ubicación:** [`src/context/MapContext.tsx:L40-L130`](file:///Users/eduardotorres/Developer/Roamly/src/context/MapContext.tsx#L40-L130)
+- **Problema:** `MapContext` agrupa en una única interfaz reactiva el estado de marcadores, animación de vuelo (`flyToTarget`), estado visual (`mapExpanded`) y las recomendaciones de Overpass (`recommendations`, `isLoadingRecs`). Cualquier búsqueda de POIs re-renderiza componentes superiores no relacionados como `MacOSMenuBar`, `Dashboard` y `AppShell`.
+- **Acción:** Dividir `MapContext` en sub-contextos de UI (`MapUIContext`), Acciones (`MapDispatchContext`) y POIs (`MapPOIContext`).
 
-#### 3.2. Implementación de Esquema Zod y Migraciones en Repository Pattern
-- **Problema:** En `src/repository/TripRepository.ts`, la deserialización confía ciegamente en que el JSON recuperado coincide con la interfaz `Trip`.
-- **Refactor Recomendado:**
-  ```typescript
-  import { z } from 'zod'
-
-  export const ActivitySchema = z.object({
-    id: z.string(),
-    title: z.string(),
-    type: z.enum(['flight', 'hotel', 'food', 'sightseeing', 'transport', 'other']),
-    startTime: z.string(),
-    endTime: z.string().optional(),
-    notes: z.string().optional(),
-    location: z.string().optional(),
-    lat: z.number().optional(),
-    lon: z.number().optional(),
-  })
-  ```
-  Esto garantizará que cualquier cambio futuro en la estructura de datos no corrompa el almacenamiento del cliente.
-
-#### 3.3. Sistema de Internacionalización (i18n) Unificado
-- **Problema:** La carpeta `/landing` (Astro) implementa i18n (`/src/i18n/ui.ts` y subrutas `/en/`), pero la aplicación principal SPA en React tiene textos en inglés hardcodeados (`"Add Trip"`, `"Something went wrong"`, etc.).
-- **Refactor Recomendado:** Integrar `i18next` o `react-intl` en la SPA para permitir alternar fluidamente entre Español, Inglés y otros idiomas tanto en la Landing como en la App.
-
-#### 3.4. Pruebas End-to-End (E2E) con Playwright
-- **Estado Actual:** 47 unit/integration tests pasando con Vitest + JSDOM.
-- **Acción Futura:** Agregar una suite de pruebas E2E con Playwright para testear los flujos de usuario críticos:
-  1. Crear un viaje nuevo.
-  2. Agregar actividades y verificar que aparezcan los pines en el mapa Leaflet.
-  3. Importar un archivo `.ics` de prueba.
-  4. Borrar viaje con confirmación.
-
-#### 3.5. Gestión de Estado Global Escatable (Si se añade Supabase)
-- **Estado Actual:** `TripContext` + `TripRepositoryPattern` funciona de forma impecable para `localStorage`.
-- **Acción Futura:** Si la app evoluciona hacia arquitectura multiusuario en la nube, reemplazar o complementar `TripContext` con **TanStack Query (React Query)** o **Zustand** para manejar la invalidación de caché, estados de carga (loading spinners) y optimismo en mutaciones.
+### 🟠 [HIGH] SCH-01: Falta de Validación de Esquema en Tiempo de Ejecución en `localStorage`
+- **Ubicación:** [`src/repository/TripRepository.ts:L78-L85`](file:///Users/eduardotorres/Developer/Roamly/src/repository/TripRepository.ts#L78-L85)
+- **Problema:** `read()` ejecuta `JSON.parse(raw) as Trip[]` mediante un type-cast estático. Si los datos almacenados carecen de campos críticos (ej. `days` no es un array o está corrupto), el fallo se producirá aguas abajo durante el renderizado en React.
+- **Acción:** Añadir una función de type-guard liviana (`isValidTripArray`) antes de devolver los datos.
 
 ---
 
-## 📊 Resumen Ejecutivo y Conclusión
+## 🟡 Hallazgos de Media Prioridad (MEDIUM 🟡)
 
-Roamly cuenta con una base de código moderna, bien estructurada y testeada (React 19 + TypeScript + Vite + Tailwind + Repository Pattern).
-
-| Criterio | Puntuación | Estado |
-| :--- | :---: | :--- |
-| **Seguridad** | 9.0 / 10 | 🟢 Bueno (Aislar sanitización ICS y restrict CORS en proxy) |
-| **Arquitectura & DX** | 9.5 / 10 | 🟢 Excelente (Repository Pattern desacoplado y 47/47 tests) |
-| **Rendimiento** | 9.5 / 10 | 🟢 Excelente (Bundle splitting <68kB, rate limiting geocoding) |
-| **Nuevas Features (Roadmap)** | High Potential | 🚀 Listo para iterar en PWA, Export .ics y Budget Tracker |
+1. **BUG-01 (MEDIUM):** Advertencia de linter `react-hooks/exhaustive-deps` y sincronización redundante de `selectedDayId` en [`src/pages/TripDetail.tsx:L73-L92`](file:///Users/eduardotorres/Developer/Roamly/src/pages/TripDetail.tsx#L73-L92).
+2. **BUG-02 (MEDIUM):** Falsy check defectuoso en `if (!result.lat || !result.lon)` en [`src/utils/destinationImages.ts:L97`](file:///Users/eduardotorres/Developer/Roamly/src/utils/destinationImages.ts#L97) que falla en coordenadas 0 (Ecuador/Meridiano).
+3. **BUG-03 (MEDIUM):** Ambigüedad semántica entre eventos a medianoche ("00:00") y actividades sin hora en [`src/types/index.ts`](file:///Users/eduardotorres/Developer/Roamly/src/types/index.ts) y [`src/utils/icsExport.ts`](file:///Users/eduardotorres/Developer/Roamly/src/utils/icsExport.ts).
+4. **SEC-02 (MEDIUM):** Almacenamiento en texto plano en `localStorage` sin soporte de cifrado opcional para datos sensibles de viaje.
+5. **SEC-03 (MEDIUM):** Ausencia de escapado de caracteres Markdown en [`src/utils/itineraryMarkdown.ts:L28-L37`](file:///Users/eduardotorres/Developer/Roamly/src/utils/itineraryMarkdown.ts#L28-L37).
+6. **ARCH-02 (MEDIUM):** Interfaz síncrona en `TripRepository` que dificulta la migración directa a bases de datos asíncronas remotas (Supabase/IndexedDB).
+7. **ARCH-03 (MEDIUM):** Acoplamiento de lógica de red, debouncing y abort controllers dentro de componentes visuales de modales.
+8. **PERF-01 (MEDIUM):** Recálculo sin memoización en `filteredTrips` ([`Dashboard.tsx`](file:///Users/eduardotorres/Developer/Roamly/src/pages/Dashboard.tsx#L135)) y cálculo de gradientes en [`TripCard.tsx`](file:///Users/eduardotorres/Developer/Roamly/src/components/dashboard/TripCard.tsx#L47).
+9. **SCH-02 (MEDIUM):** Ausencia de campo de versionado de esquema (`schemaVersion: 1`) para migraciones futuras.
 
 ---
 
-*Reporte generado automáticamente en el directorio `.audit/FULL_REVIEW.md`*.
+## 🟢 Hallazgos de Baja Prioridad y Deuda Técnica (LOW 🟢)
+
+1. **SEC-04 (LOW):** Falta de validación de tamaño máximo de archivo (< 5 MB) en [`CalendarImportModal.tsx`](file:///Users/eduardotorres/Developer/Roamly/src/components/modals/CalendarImportModal.tsx).
+2. **SEC-05 (LOW):** Advertencia de CSP en `connect-src` para despliegues con proxy Unsplash cross-domain.
+3. **BUG-04 (LOW):** Manejo silencioso en bloques `catch` de portapapeles y exportación en [`TripDetail.tsx`](file:///Users/eduardotorres/Developer/Roamly/src/pages/TripDetail.tsx).
+4. **BUG-05 (LOW):** Posible duplicación de query params al concatenar `&w=1920&q=85` en [`api/unsplash.ts`](file:///Users/eduardotorres/Developer/Roamly/api/unsplash.ts).
+5. **ARCH-04 (LOW):** Convivencia monorepo de Tailwind v3 (SPA) y Tailwind v4 (Landing).
+6. **PERF-02 (LOW):** Micro-optimización de comprobación de fechas en `CalendarWidget` en [`Dashboard.tsx`](file:///Users/eduardotorres/Developer/Roamly/src/pages/Dashboard.tsx).
+7. **PERF-03 (LOW):** Falta de virtualización en listas masivas de POIs o itinerarios muy extensos.
+8. **DEAD-01 (LOW):** Función exportada huérfana `getDayTabLabel` en [`src/utils/dates.ts:L119`](file:///Users/eduardotorres/Developer/Roamly/src/utils/dates.ts#L119).
+9. **DEAD-02 (LOW):** Tipado `@types/leaflet` ubicado en `dependencies` en lugar de `devDependencies` en [`package.json`](file:///Users/eduardotorres/Developer/Roamly/package.json).
+10. **DEAD-03 (LOW):** Duplicación de tipos entre `DestinationImage` (`api/unsplash.ts`) y `UnsplashResult` (`src/utils/destinationImages.ts`).
+11. **SCH-03 (LOW):** Clave de persistencia histórica `wanderplan-trips` mantenida por retrocompatibilidad.
+
+---
+
+*Para el desglose técnico detallado, diagramas y soluciones paso a paso, consultar [.audit/FULL_AUDIT_REPORT.md](file:///Users/eduardotorres/Developer/Roamly/.audit/FULL_AUDIT_REPORT.md).*

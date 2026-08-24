@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Roamly — Architecture Review</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'dark' });</script>
+<style>
+  :root {
+    --bg: #0f1419; --panel: #1a2230; --edge: #2a3547;
+    --ink: #e6edf3; --muted: #8b98a9; --accent: #5b9dff;
+    --hi: #ff6b6b; --med: #ffb454; --ok: #4ec9a0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.6 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    padding: 40px 24px;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; }
+  h1 { font-size: 30px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin-bottom: 32px; }
+  .meta { display: flex; gap: 24px; flex-wrap: wrap; color: var(--muted); font-size: 13px; margin-bottom: 32px; }
+  .finding {
+    background: var(--panel); border: 1px solid var(--edge);
+    border-radius: 12px; padding: 24px; margin-bottom: 24px;
+  }
+  .finding h2 { margin: 0 0 4px; font-size: 20px; display: flex; align-items: center; gap: 10px; }
+  .tag { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+         padding: 3px 8px; border-radius: 6px; }
+  .t-hi  { background: rgba(255,107,107,.15); color: var(--hi); }
+  .t-med { background: rgba(255,180,84,.15); color: var(--med); }
+  .cat { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+  code { background: #0b0f14; padding: 2px 6px; border-radius: 4px; font-size: 13px;
+         color: #d6c7ff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .diagram { background: #0b0f14; border: 1px solid var(--edge); border-radius: 8px;
+             padding: 16px; margin: 16px 0; text-align: center; }
+  .evidence { border-left: 3px solid var(--accent); padding: 4px 0 4px 14px; margin: 14px 0;
+              color: var(--muted); font-size: 14px; }
+  .fix { background: rgba(78,201,160,.08); border: 1px solid rgba(78,201,160,.25);
+         border-radius: 8px; padding: 12px 16px; margin-top: 16px; }
+  .fix b { color: var(--ok); }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--edge); }
+  th { color: var(--muted); font-weight: 600; }
+  .banner { background: rgba(91,157,255,.08); border: 1px solid rgba(91,157,255,.3);
+            border-radius: 8px; padding: 12px 16px; margin-bottom: 28px; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Roamly — Architecture Review</h1>
+  <div class="sub">Read-only structural scan · top 3 findings</div>
+  <div class="meta">
+    <span>📅 2026-08-17</span>
+    <span>📦 30 source files · 6,066 LOC</span>
+    <span>🔍 shallow modules · AI slop · dead code · coupling · testability</span>
+  </div>
+
+  <div class="banner">
+    <b>No changes made.</b> This is a scan. Findings ranked by leverage — how much
+    clarity you buy per unit of edit. Nothing here is a correctness bug; all three are
+    maintainability drag.
+  </div>
+
+  <!-- FINDING 1 -->
+  <div class="finding">
+    <h2>1. Three-file indirection chain for the trip context <span class="tag t-hi">High</span></h2>
+    <div class="cat">Shallow modules · tight coupling · <code>src/hooks/useTrips.ts</code></div>
+
+    <p>The trip context is spread across three files where one deep module would do.
+    Data + provider live in <code>TripContext.tsx</code>; the raw contexts and their
+    accessor hooks live in <code>useTripContext.ts</code>; then <code>useTrips.ts</code>
+    re-exports those same hooks under renamed aliases and adds <b>zero behavior</b>.
+    Every consumer imports the third file, so a reader chasing <code>useTripActions</code>
+    hops through two pure pass-throughs before reaching logic.</p>
+
+    <div class="diagram">
+      <pre class="mermaid">
+flowchart LR
+  C["Consumers<br/>Dashboard, AppShell,<br/>AddTripModal, TripDetail"]
+  T["useTrips.ts<br/><i>rename-only re-export</i>"]
+  H["useTripContext.ts<br/>createContext + hooks"]
+  P["TripContext.tsx<br/>TripProvider + logic"]
+  C -->|"import useTripActions"| T
+  T -->|"useTripDispatch as useTripActions"| H
+  H -->|"TripDispatchContext"| P
+  P -->|"provides value"| H
+  style T fill:#3a2020,stroke:#ff6b6b
+  style H fill:#2a2a1a,stroke:#ffb454
+      </pre>
+    </div>
+
+    <div class="evidence">
+      <code>useTrips.ts</code> is 17 lines, 12 of them comment/JSDoc, and its whole body is
+      <code>export { useTripState as useTrips, useTripDispatch as useTripActions, useTripById }</code>.
+      The split of state-vs-dispatch context (in <code>useTripContext.ts</code>) is a
+      <i>legitimate</i> re-render optimization — the extra rename layer on top of it is not.
+    </div>
+
+    <div class="fix">
+      <b>Fix:</b> collapse <code>useTrips.ts</code> into <code>useTripContext.ts</code> —
+      export the public names (<code>useTrips</code>, <code>useTripActions</code>,
+      <code>useTripById</code>) directly from where the hooks are defined. Two files, one
+      import path, no rename hop. Keeps the state/dispatch context split intact.
+    </div>
+  </div>
+
+  <!-- FINDING 2 -->
+  <div class="finding">
+    <h2>2. Comment-to-code inversion (AI slop) <span class="tag t-med">Medium</span></h2>
+    <div class="cat">Redundant / over-explaining comments · utils + hooks + context</div>
+
+    <p>Several modules carry more comment than code, restating what the code already says.
+    <code>generateId</code> is a one-line <code>Date.now() + Math.random()</code> wrapped in a
+    9-line essay on collision probability. The signal (the genuinely useful notes — StrictMode
+    idempotency, out-of-order Overpass responses) is buried in equal volume of narration of the
+    obvious.</p>
+
+    <table>
+      <tr><th>File</th><th>Comment lines</th><th>Total</th><th>Ratio</th></tr>
+      <tr><td><code>src/utils/id.ts</code></td><td>11</td><td>14</td><td>79%</td></tr>
+      <tr><td><code>src/hooks/useTrips.ts</code></td><td>12</td><td>17</td><td>71%</td></tr>
+      <tr><td><code>src/hooks/useTripContext.ts</code></td><td>39</td><td>62</td><td>63%</td></tr>
+      <tr><td><code>src/context/TripContext.tsx</code></td><td>75</td><td>257</td><td>29%</td></tr>
+    </table>
+
+    <div class="diagram">
+      <pre class="mermaid">
+pie showData
+  title id.ts — 14 lines
+  "Comment" : 11
+  "Code" : 3
+      </pre>
+    </div>
+
+    <div class="evidence">
+      Not all comments are slop — keep the <i>why</i> (why split contexts, why debounce 300ms,
+      why idempotent upsert). Cut the <i>what</i>: JSDoc that repeats the type signature, and
+      inline comments narrating each <code>.map()</code> traversal in
+      <code>TripContext.tsx</code>.
+    </div>
+
+    <div class="fix">
+      <b>Fix:</b> delete comments that restate the signature or the next line. Target ratio for
+      leaf utils: under ~25%. Keep the non-obvious rationale blocks.
+    </div>
+  </div>
+
+  <!-- FINDING 3 -->
+  <div class="finding">
+    <h2>3. Testable pure logic trapped inside a page component <span class="tag t-med">Medium</span></h2>
+    <div class="cat">Hard-to-test code path · <code>src/pages/TripDetail.tsx</code></div>
+
+    <p><code>generateItineraryMarkdown(trip)</code> is a pure, deterministic serializer —
+    exactly the kind of function that should have unit tests. But it is a private,
+    un-exported function inside a 406-line page component, so it cannot be reached from a test
+    without rendering the whole page. Its sibling <code>generateTripICS</code> (same shape,
+    trip → string) lives in <code>utils/icsExport.ts</code>, is exported, and <b>has tests</b>
+    (<code>icsExport.test.ts</code>). Same job, opposite testability — purely because of file
+    placement.</p>
+
+    <div class="diagram">
+      <pre class="mermaid">
+flowchart TB
+  subgraph tested["✅ tested"]
+    ICS["generateTripICS()<br/>utils/icsExport.ts"]
+    ICST["icsExport.test.ts"]
+    ICS --- ICST
+  end
+  subgraph untested["❌ no test reachable"]
+    MD["generateItineraryMarkdown()<br/><i>private, inside TripDetail.tsx</i>"]
+    PAGE["406-line page component"]
+    MD -.trapped in.-> PAGE
+  end
+  style untested fill:#2a1a1a,stroke:#ff6b6b
+  style tested fill:#132a20,stroke:#4ec9a0
+      </pre>
+    </div>
+
+    <div class="evidence">
+      Same finding blocks the two export handlers: <code>handleExport</code> /
+      <code>handleExportCalendar</code> mix pure serialization with <code>navigator.clipboard</code>,
+      blob URLs, and <code>trip!</code> non-null assertions — untestable side effects wrapped
+      around testable logic.
+    </div>
+
+    <div class="fix">
+      <b>Fix:</b> move <code>generateItineraryMarkdown</code> into
+      <code>utils/itineraryMarkdown.ts</code> and export it, mirroring <code>icsExport.ts</code>.
+      Add a unit test alongside. The page then just calls it — the pure/impure boundary lands on
+      a file boundary.
+    </div>
+  </div>
+
+  <div class="sub" style="margin-top:32px">
+    Scanned but not in top 3: <code>usePOIService</code>/<code>MapContext</code> coupling
+    (justified — real re-render + Leaflet-bridge reasons); no true dead code found
+    (the context hooks are all reached via the re-export shim in finding 1).
+  </div>
+</div>
+</body>
+</html>

@@ -1,69 +1,92 @@
-# 💎 Reporte de Auditoría de Calidad de Código y DX — Roamly
+# 💎 Reporte Completo de Auditoría de Calidad de Código y DX — Roamly
 
-**Módulo:** Calidad de Código, Linter, Error Boundaries, Pruebas Automatizadas y Mantenibilidad  
-**Fecha:** 7 de Agosto de 2026  
-**Auditor:** Code Reviewer & Security Auditor Agent (`code-reviewer-auditor`)
-
----
-
-## 🎯 Resumen de Hallazgos de Calidad de Código
-
-| ID | Severidad | Título / Área | Archivo Afectado | Estado |
-| :--- | :---: | :--- | :--- | :---: |
-| **QUAL-01** | 🟠 ALTO | Cobertura de Pruebas (Vitest + jsdom + 47 Tests Unitarios) | [`src/__tests__/`](file:///Users/eduardotorres/Developer/Roamly/src/__tests__) | **RESUELTO ✅ (Suite Completa)** |
-| **QUAL-02** | 🟡 MEDIO | Ausencia de Error Boundaries en la Raíz UI | [`src/components/ErrorBoundary.tsx`](file:///Users/eduardotorres/Developer/Roamly/src/components/ErrorBoundary.tsx) | **RESUELTO ✅ (ErrorBoundary)** |
-| **QUAL-03** | 🔵 BAJO | Data Estática Embebida en Código de Utilidades | [`src/data/curatedDestinations.json`](file:///Users/eduardotorres/Developer/Roamly/src/data/curatedDestinations.json) | **RESUELTO ✅ (JSON Data)** |
-| **QUAL-04** | 🔵 BAJO | Fast Refresh / Exportaciones Múltiples en Componentes | [`src/components/ui/button.tsx`](file:///Users/eduardotorres/Developer/Roamly/src/components/ui/button.tsx#L19) | INFORMATIVO |
+**Módulo:** Calidad de Código, Cobertura de Pruebas, Linter, Sistema de Tipos, Dead Code y DX  
+**Fecha de Auditoría:** 24 de Agosto de 2026  
+**Auditor:** Agentic AI Code Reviewer & QA Specialist  
+**Repositorio:** [`Roamly`](file:///Users/eduardotorres/Developer/Roamly)
 
 ---
 
-## 🛠️ Análisis Detallado de Calidad de Código y Suite de Pruebas
+## 🎯 Resumen Ejecutivo de Calidad
 
-### QUAL-01: Suite de Pruebas Automatizadas con Vitest y JSDOM (🟠 ALTO — RESUELTO ✅)
-
-#### Diagnóstico Previo vs Estado Actual
-- **Previo:** No existía configuración de pruebas ni suite de tests en el proyecto (0% de cobertura automatizada).
-- **Estado Actual:** ✅ **Resuelto**. Se configuró la infraestructura de pruebas completa:
-  - **`package.json`:** Agregados `"test": "vitest run"`, `"vitest": "^4.1.10"` y `"jsdom": "^30.0.1"`.
-  - **`tsconfig.app.json`:** Incluido `"src/__tests__"` en el campo `"include"`.
-  - **`vitest.config.ts`:** Reutiliza la configuración de Vite (`viteConfig`) garantizando alias de rutas (`@/`) y plugins de React, configurando el entorno `jsdom` y coincidencia de archivos `src/__tests__/**/*.test.{ts,tsx}`.
-
-#### Cobertura y Evaluación de Pruebas (`47/47 Passed`)
-
-1. **Pruebas de Utilidades de Fechas ([`dates.test.ts`](file:///Users/eduardotorres/Developer/Roamly/src/__tests__/dates.test.ts) — 17 tests):**
-   - Valida la generación inclusiva de días, rangos de 1 solo día, IDs únicos, límites de mes, años bisiestos (`2024-02-29`), entradas inválidas, `getTodayISO`, `formatDate` en UTC sin deslizamientos de fecha, y resiliencia a cambios de horario de verano (DST).
-
-2. **Pruebas de Geocodificación ([`geocoding.test.ts`](file:///Users/eduardotorres/Developer/Roamly/src/__tests__/geocoding.test.ts) — 9 tests):**
-   - Valida consultas vacías/espacios sin peticiones de red, parsing de resultados Nominatim, caché insensible a mayúsculas/minúsculas, caché de resultados negativos (sin coincidencias), no-cacheo de errores HTTP 429/5xx con reintentos posteriores, degradación ante fallos de red, desambiguación de ubicaciones en `geocodeActivity` y serialización de peticiones respetando el intervalo de 1000 ms.
-
-3. **Pruebas de Parser ICS ([`icsParser.test.ts`](file:///Users/eduardotorres/Developer/Roamly/src/__tests__/icsParser.test.ts) — 15 tests):**
-   - Valida extracción de nombre de calendario, conversión UTC a ISO sin sufijo `Z`, conversión de fechas simples, desestimación de parámetros de propiedad (`TZID`), desplegado de líneas plegadas RFC 5545, terminadores de línea CRLF/LF, decodificación de caracteres escapados (`\n`, `\,`), detección de vuelos (aerolínea + número de vuelo), hoteles y eventos genéricos, omitido de eventos sin título y agrupación en viajes.
-
-4. **Pruebas del Repositorio ([`repository.test.ts`](file:///Users/eduardotorres/Developer/Roamly/src/__tests__/repository.test.ts) — 6 tests):**
-   - Valida `LocalStorageTripRepository` con `MemoryStorage` aislado: retorno de arrays vacíos, guardado y recuperación de viajes, actualización en el lugar (*in-place upsert*), eliminación por ID, manejo tolerante a errores de JSON corrupto y captura de excepciones en fallos de cuota de almacenamiento.
+La calidad técnica general del código en **Roamly** es de nivel profesional:
+- **Suite de Pruebas Automatizadas:** 🟢 **58/58 tests pasando (100%)** con Vitest y JSDOM.
+- **Compilador TypeScript:** 🟢 **0 errores de tipos** en modo estricto (`erasableSyntaxOnly: true`).
+- **Linter ESLint 9:** 🟡 **1 advertencia** identificada en [`src/pages/TripDetail.tsx:L80`](file:///Users/eduardotorres/Developer/Roamly/src/pages/TripDetail.tsx#L80) (`react-hooks/exhaustive-deps`).
 
 ---
 
-### QUAL-02: Implementación de Error Boundaries Globales (🟡 MEDIO — RESUELTO ✅)
+## 📊 Matriz de Hallazgos de Calidad de Código por Severidad
 
-#### Diagnóstico Previo vs Estado Actual
-- **Estado Actual:** ✅ **Resuelto**. Se desarrolló [`src/components/ErrorBoundary.tsx`](file:///Users/eduardotorres/Developer/Roamly/src/components/ErrorBoundary.tsx) e integró en [`src/App.tsx`](file:///Users/eduardotorres/Developer/Roamly/src/App.tsx#L20-L32). El ErrorBoundary muestra un panel de rescate decoroso con opciones de recarga y reset.
+| ID | Severidad | Área / Componente | Archivo Afectado | Descripción Corta | Estado |
+| :--- | :---: | :--- | :--- | :--- | :---: |
+| **QUAL-01** | 🟡 MEDIUM | Advertencia ESLint | [`TripDetail.tsx:L80`](file:///Users/eduardotorres/Developer/Roamly/src/pages/TripDetail.tsx#L80) | `react-hooks/exhaustive-deps`: Dependencia faltante `trip.days` en `useEffect` | ⚠️ IDENTIFICADO |
+| **QUAL-02** | 🟡 MEDIUM | Edge Case Coordenadas 0 | [`destinationImages.ts:L97`](file:///Users/eduardotorres/Developer/Roamly/src/utils/destinationImages.ts#L97) | Falsy check `!result.lat` activa fallback erróneo en coordenadas 0 | ⚠️ IDENTIFICADO |
+| **QUAL-03** | 🟡 MEDIUM | Tipado Hora Centinela | [`types/index.ts:L24-L26`](file:///Users/eduardotorres/Developer/Roamly/src/types/index.ts#L24-L26) | `"00:00"` utilizado como centinela en vez de propiedad opcional `startTime?` | ⚠️ IDENTIFICADO |
+| **QUAL-04** | 🟢 LOW | Dead Code / Exportación Huérfana | [`dates.ts:L119-L121`](file:///Users/eduardotorres/Developer/Roamly/src/utils/dates.ts#L119-L121) | `getDayTabLabel` exportada pero no consumida por ningún componente | ⚠️ IDENTIFICADO |
+| **QUAL-05** | 🟢 LOW | Ubicación de Tipos en package.json | [`package.json:L17`](file:///Users/eduardotorres/Developer/Roamly/package.json#L17) | `@types/leaflet` en `dependencies` en lugar de `devDependencies` | ⚠️ IDENTIFICADO |
+| **QUAL-06** | 🟢 LOW | Duplicación de Tipos de Imagen | [`api/unsplash.ts` vs `destinationImages.ts`](file:///Users/eduardotorres/Developer/Roamly/api/unsplash.ts) | Estructuras idénticas `DestinationImage` y `UnsplashResult` | ⚠️ IDENTIFICADO |
+| **QUAL-07** | 🟢 LOW | Suite de Pruebas Unitarias | [`src/__tests__/`](file:///Users/eduardotorres/Developer/Roamly/src/__tests__) | 58 pruebas automáticas cubriendo fechas, geocodificación, ICS y repositorio | **RESUELTO ✅ (58/58 Passed)** |
 
 ---
 
-### QUAL-03: Separación de Archivos de Datos Estáticos (🔵 BAJO — RESUELTO ✅)
+## 🛠️ Detalle de la Suite de Pruebas Automatizadas (58/58 Passed)
 
-#### Diagnóstico Previo vs Estado Actual
-- **Estado Actual:** ✅ **Resuelto**. Los metadatos de destinos fueron extraídos al archivo JSON independiente [`src/data/curatedDestinations.json`](file:///Users/eduardotorres/Developer/Roamly/src/data/curatedDestinations.json).
+Ejecución de `npm run test` (Vitest v4.1.10):
 
----
+```text
+ ✓ src/__tests__/icsParser.test.ts (15 tests)
+ ✓ src/__tests__/repository.test.ts (6 tests)
+ ✓ src/__tests__/dates.test.ts (17 tests)
+ ✓ src/__tests__/icsExport.test.ts (11 tests)
+ ✓ src/__tests__/geocoding.test.ts (9 tests)
 
-### QUAL-04: Cumplimiento de Reglas de ESLint 9 & Fast Refresh (🔵 BAJO — PASANDO 100%)
-
-#### Diagnóstico
-La ejecución de `npm run lint` pasa de forma limpia con **0 advertencias y 0 errores**:
+ Test Files  5 passed (5)
+      Tests  58 passed (58)
 ```
-> wanderplan@0.0.0 lint
-> eslint .
-```
-`AddTripModal.tsx` fue corregido sustituyendo invocaciones síncronas de `setState` dentro de `useEffect` por programaciones asíncronas seguras, previniendo re-renderizados en cascada.
+
+### Cobertura por Módulo
+1. **`dates.test.ts` (17 tests):** Parsing UTC, cálculo de duración, etiquetado de pestañas y prevención de bugs DST.
+2. **`icsParser.test.ts` (15 tests):** Desplegado de líneas RFC 5545, extracción de números de vuelo, autodetección de hoteles y sanitización de enlaces/etiquetas.
+3. **`icsExport.test.ts` (11 tests):** Serialización iCalendar RFC 5545, plegado a 75 octetos, horas flotantes y generación de nombres de archivo slug.
+4. **`geocoding.test.ts` (9 tests):** Throttling serializado de 1s de Nominatim, caché en memoria y reintentos ante fallos 429/5xx.
+5. **`repository.test.ts` (6 tests):** CRUD sobre `LocalStorageTripRepository`, persistencia de orden y tolerancia a fallos ante JSON corrupto o `QuotaExceededError`.
+
+---
+
+## 🔍 Análisis de Advertencias y Errores de Lógica
+
+### 1. 🟡 MEDIUM: QUAL-01 — Advertencia `exhaustive-deps` en `TripDetail.tsx`
+- **Diagnóstico:**
+  ```typescript
+  // src/pages/TripDetail.tsx:L75-L80
+  useEffect(() => {
+    if (trip?.days[0]?.id) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelectedDayId(trip.days[0].id)
+    }
+  }, [tripId])
+  ```
+  ESLint advierte que `trip.days` falta en el array de dependencias.
+- **Solución Recomendada:** Derivar la selección del día activo durante el render:
+  ```typescript
+  const selectedDay = trip?.days.find((d) => d.id === selectedDayId) ?? trip?.days[0]
+  ```
+  Y remover el efecto secundario redundante.
+
+---
+
+### 2. 🟡 MEDIUM: QUAL-02 — Manejo de Coordenadas 0 en `destinationImages.ts`
+- **Diagnóstico:**
+  ```typescript
+  // src/utils/destinationImages.ts:L97
+  if (!result.lat || !result.lon) {
+    const geo = await geocodePlace(destination, signal)
+    ...
+  }
+  ```
+  Si `lat === 0` o `lon === 0`, `!result.lat` evalúa a `true`, llamando a `geocodePlace()` innecesariamente.
+- **Solución Recomendada:**
+  ```typescript
+  if (result.lat == null || result.lon == null) { ... }
+  ```

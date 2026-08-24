@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { useTripActions } from '@/hooks/useTrips'
 import { fetchDestinationImage } from '@/utils/destinationImages'
+import { getTodayISO } from '@/utils/dates'
 
 interface AddTripModalProps {
   open: boolean
@@ -150,7 +151,7 @@ export default function AddTripModal({ open, onClose }: AddTripModalProps) {
     navigate(`/trip/${tripId}`)
   }
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = getTodayISO()
 
   return (
     <Dialog open={open} onOpenChange={(open) => !open && handleClose()}>

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { LocalStorageTripRepository, TRIPS_STORAGE_KEY } from '@/repository/TripRepository'
+import { LocalStorageTripRepository, TRIPS_STORAGE_KEY, TripRepositoryReadError } from '@/repository/TripRepository'
 import type { Trip } from '@/types'
 
 const sampleTrip: Trip = {
@@ -99,8 +99,7 @@ describe('LocalStorageTripRepository', () => {
     const repo = new LocalStorageTripRepository(TRIPS_STORAGE_KEY, memoryStorage)
     expect(repo.getAll()).toEqual([])
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('failed to read'),
-      expect.any(SyntaxError),
+      expect.any(TripRepositoryReadError)
     )
   })
 

@@ -1,65 +1,68 @@
-# 🛡️ Reporte de Auditoría de Seguridad — Roamly
+# 🛡️ Reporte Completo de Auditoría de Seguridad — Roamly
 
-**Módulo:** Seguridad, Sanitización de Entradas y Protección de Datos  
-**Fecha:** 7 de Agosto de 2026  
-**Auditor:** Code Reviewer & Security Auditor Agent (`code-reviewer-auditor`)
-
----
-
-## 🎯 Resumen de Hallazgos de Seguridad
-
-| ID | Severidad | Título / Área | Archivo Afectado | Estado |
-| :--- | :---: | :--- | :--- | :---: |
-| **SEC-01** | 🟠 ALTO | Exposición de Claves API de Cliente (`VITE_UNSPLASH_ACCESS_KEY`) | [`src/utils/destinationImages.ts`](file:///Users/eduardotorres/Developer/Roamly/src/utils/destinationImages.ts) | **RESUELTO ✅ (Edge Proxy)** |
-| **SEC-02** | 🟠 ALTO | Eliminación Destructiva Sin Confirmación (Pérdida Accidental) | [`src/components/dashboard/TripCard.tsx`](file:///Users/eduardotorres/Developer/Roamly/src/components/dashboard/TripCard.tsx) | **RESUELTO ✅ (ConfirmDialog)** |
-| **SEC-03** | 🟡 MEDIO | Lectura de `localStorage` Sin Validar Esquema de Objetos | [`src/repository/TripRepository.ts`](file:///Users/eduardotorres/Developer/Roamly/src/repository/TripRepository.ts#L47-L57) | **MEJORADO ✅ (Soft Failure / Repo)** |
-| **SEC-04** | 🟡 MEDIO | Concatención y Renderizado de Archivos ICS Sin Sanitizar | [`src/utils/icsParser.ts`](file:///Users/eduardotorres/Developer/Roamly/src/utils/icsParser.ts#L223) | PENDIENTE |
-| **SEC-05** | 🟢 BAJO | Cabecera User-Agent Estática en Consultas Nominatim | [`src/utils/geocoding.ts`](file:///Users/eduardotorres/Developer/Roamly/src/utils/geocoding.ts#L5) | INFORMATIVO |
+**Módulo:** Seguridad de la Información, Inyección, XSS, Protección de API Keys, CORS, Rate Limiting y Sanitización  
+**Fecha de Auditoría:** 24 de Agosto de 2026  
+**Auditor:** Agentic AI Code Reviewer & Security Auditor  
+**Repositorio:** [`Roamly`](file:///Users/eduardotorres/Developer/Roamly)  
+**Alcance (Scope):** Todo el código fuente en `src/`, `api/`, `landing/` y configuraciones.
 
 ---
 
-## 🔍 Análisis Detallado de Hallazgos de Seguridad
+## 🎯 Resumen Ejecutivo de Seguridad
 
-### SEC-01: Exposición de Claves API de Unsplash en Bundle Client (🟠 ALTO — RESUELTO ✅)
-
-#### Diagnóstico Previo vs Estado Actual
-- **Previo:** `import.meta.env.VITE_UNSPLASH_ACCESS_KEY` se compilaba directamente en el bundle JS cliente, permitiendo a cualquier usuario extraer la clave de Unsplash desde la consola del navegador.
-- **Estado Actual:** ✅ **Resuelto**. Se implementó una función Edge Proxy en [`api/unsplash.ts`](file:///Users/eduardotorres/Developer/Roamly/api/unsplash.ts) que ejecuta la autenticación en el lado del servidor con `process.env.UNSPLASH_ACCESS_KEY`. [`src/utils/destinationImages.ts`](file:///Users/eduardotorres/Developer/Roamly/src/utils/destinationImages.ts#L24) consume la proxy vía `PROXY_URL` (`VITE_UNSPLASH_PROXY_URL`) o recurre al catálogo estático curado en `src/data/curatedDestinations.json`.
+La evaluación de seguridad del repositorio **Roamly** confirma una postura defensiva sólida en frontend y edge proxy. Los vectores críticos comunes en SPAs (tales como exposición de secretos en bundles cliente mediante `VITE_` o inyecciones XSS vía `.ics`) están prevenidos. No obstante, se identifican áreas de mejora prioritarias en el **rate limiting del Edge Proxy** y la **validación de esquemas en tiempo de ejecución**.
 
 ---
 
-### SEC-02: Borrado Destructivo Directo Sin Confirmación (🟠 ALTO — RESUELTO ✅)
+## 📊 Matriz de Hallazgos de Seguridad por Severidad
 
-#### Diagnóstico Previo vs Estado Actual
-- **Previo:** Al presionar el botón de la papelera en un viaje o actividad, se ejecutaba inmediatamente la función de borrado de `localStorage`, sin modal de confirmación ni opción de deshacer.
-- **Estado Actual:** ✅ **Resuelto**. Se creó el componente reutilizable [`src/components/modals/ConfirmDialog.tsx`](file:///Users/eduardotorres/Developer/Roamly/src/components/modals/ConfirmDialog.tsx) utilizando Radix UI Dialog. [`TripCard.tsx`](file:///Users/eduardotorres/Developer/Roamly/src/components/dashboard/TripCard.tsx), [`ActivityItem.tsx`](file:///Users/eduardotorres/Developer/Roamly/src/components/trip/ActivityItem.tsx), [`Dashboard.tsx`](file:///Users/eduardotorres/Developer/Roamly/src/pages/Dashboard.tsx) y [`TripDetail.tsx`](file:///Users/eduardotorres/Developer/Roamly/src/pages/TripDetail.tsx) invocan la confirmación previo a remover elementos.
-
----
-
-### SEC-03: Tolerancia a Fallos en Almacenamiento Local (🟡 MEDIO — MEJORADO ✅)
-
-#### Diagnóstico Previo vs Estado Actual
-- **Previo:** La lectura directa de `localStorage` mediante `JSON.parse` podía provocar excepciones de síntaxis si los datos estaban corruptos.
-- **Estado Actual:** ✅ **Mejorado**. [`LocalStorageTripRepository`](file:///Users/eduardotorres/Developer/Roamly/src/repository/TripRepository.ts) encapsula la lectura y escritura en bloques `try/catch`. En caso de corrupción JSON o indisponibilidad de almacenamiento, la aplicación degrada suavemente (*fail-soft*) retornando un array vacío y registrando el error en consola, previniendo cuelgues catastróficos.
+| ID | Severidad | Área / Categoría | Archivo Afectado | Descripción Corta | Estado |
+| :--- | :---: | :--- | :--- | :--- | :---: |
+| **SEC-01** | 🟠 HIGH | Rate Limiting Volátil | [`api/unsplash.ts:L37-L70`](file:///Users/eduardotorres/Developer/Roamly/api/unsplash.ts#L37-L70) | Rate limiter en memoria no compartido entre nodos Edge serverless | ⚠️ IDENTIFICADO |
+| **SEC-02** | 🟡 MEDIUM | Persistencia en Texto Plano | [`TripRepository.ts:L66-L93`](file:///Users/eduardotorres/Developer/Roamly/src/repository/TripRepository.ts#L66-L93) | Datos de viaje en `localStorage` sin cifrado opcional | ⚠️ IDENTIFICADO |
+| **SEC-03** | 🟡 MEDIUM | Inyección de Formato Markdown | [`itineraryMarkdown.ts:L28-L37`](file:///Users/eduardotorres/Developer/Roamly/src/utils/itineraryMarkdown.ts#L28-L37) | Caracteres especiales de Markdown sin escapar en exportación | ⚠️ IDENTIFICADO |
+| **SEC-04** | 🟢 LOW | Límite de Tamaño de Archivo | [`CalendarImportModal.tsx:L123`](file:///Users/eduardotorres/Developer/Roamly/src/components/modals/CalendarImportModal.tsx#L123) | Ausencia de límite explícito de tamaño en carga de archivos `.ics` | ⚠️ IDENTIFICADO |
+| **SEC-05** | 🟢 LOW | Configuración de CSP | [`index.html:L12-L15`](file:///Users/eduardotorres/Developer/Roamly/index.html#L12-L15) | Política estricta de `connect-src` ante proxies cross-origin | ⚠️ IDENTIFICADO |
+| **SEC-06** | 🟢 LOW | Aislamiento de Secretos | [`api/unsplash.ts:L1-L15`](file:///Users/eduardotorres/Developer/Roamly/api/unsplash.ts#L1-L15) | `UNSPLASH_ACCESS_KEY` vive solo en el servidor edge (sin `VITE_`) | **RESUELTO ✅** |
+| **SEC-07** | 🟢 LOW | Sanitización de Contenidos ICS | [`icsParser.ts:L241-L261`](file:///Users/eduardotorres/Developer/Roamly/src/utils/icsParser.ts#L241-L261) | Sanitización de HTML, scripts y esquemas peligrosos (`javascript:`, `data:`) | **RESUELTO ✅** |
 
 ---
 
-### SEC-04: Parsing e Importación de Archivos ICS Sin Sanitizar (🟡 MEDIO — PENDIENTE)
+## 🔍 Análisis Detallado de Hallazgos y Vulnerabilidades
 
-#### Diagnóstico
-En [`src/utils/icsParser.ts`](file:///Users/eduardotorres/Developer/Roamly/src/utils/icsParser.ts#L223):
-```typescript
-description: description ? description.replace(/\\n/g, '\n').replace(/\\,/g, ',') : undefined,
-```
-- **Riesgo:** Al exportar el itinerario a Markdown en `TripDetail.tsx` (`generateItineraryMarkdown`), cadenas no sanitizadas provenientes de archivos `.ics` externos podrían inyectar enlaces maliciosos o formatos de script si el usuario pega el resumen en lectores externos.
-- **Remediación Recomendada:** Sanitizar URLs y truncar descripciones desproporcionadamente largas.
+### 1. 🟠 HIGH: SEC-01 — Rate Limiting en Memoria Volátil de Instancia Edge
+- **Ubicación:** [`api/unsplash.ts:L37-L70, L246-L256`](file:///Users/eduardotorres/Developer/Roamly/api/unsplash.ts#L37-L70)
+- **Problema:** `buckets` se gestiona en un `Map<string, { tokens: number; last: number }>` en memoria del proceso Edge. Dado que las funciones Edge se ejecutan de forma aislada y distribuida en cientos de servidores perimetrales, cada nodo mantiene su propio contador. Un atacante puede rotar conexiones o distribuir peticiones para consumir la cuota upstream de Unsplash sin ser frenado por el límite de 20 peticiones/minuto.
+- **Impacto:** Posible denegación de servicio (DoS) por agotamiento de cuota de API upstream.
+- **Remediación:** Utilizar un almacén distribuido (Upstash Redis, Vercel KV, o Cloudflare KV/Rate Limiting API) para centralizar el conteo de tokens.
 
 ---
 
-## 🛡️ Checklist de Control de Seguridad
+### 2. 🟡 MEDIUM: SEC-02 — Persistencia en Texto Plano en `localStorage`
+- **Ubicación:** [`src/repository/TripRepository.ts:L66-L93`](file:///Users/eduardotorres/Developer/Roamly/src/repository/TripRepository.ts#L66-L93)
+- **Problema:** Todos los itinerarios (fechas, hoteles, códigos de vuelo, notas personales) se guardan en texto plano bajo `localStorage.getItem('wanderplan-trips')`.
+- **Impacto:** Si bien no hay almacenamiento en servidores propios, cualquier script inyectado (por ejemplo, mediante extensiones maliciosas de navegador con permisos sobre el origen) puede leer la totalidad del historial de viajes del usuario.
+- **Remediación:** Considerar una opción de cifrado simétrico en el cliente (Web Crypto API) para usuarios que deseen proteger notas con contraseña o PIN local.
 
-- [x] Aislar `UNSPLASH_ACCESS_KEY` en Edge Function backend proxy.
-- [x] Proteger acciones de borrado destructivas mediante `ConfirmDialog`.
-- [x] Capturar excepciones globales de renderizado con `ErrorBoundary`.
-- [x] Encapsular operaciones de persistencia en `TripRepository` con degradación suave (*fail-soft*).
-- [ ] Sanitizar hipervínculos en archivos `.ics` importados.
+---
+
+### 3. 🟡 MEDIUM: SEC-03 — Inyección de Formato en Exportación de Markdown
+- **Ubicación:** [`src/utils/itineraryMarkdown.ts:L28-L37`](file:///Users/eduardotorres/Developer/Roamly/src/utils/itineraryMarkdown.ts#L28-L37)
+- **Problema:** Al generar el itinerario en Markdown (`generateItineraryMarkdown`), `activity.title`, `activity.notes` y `trip.destination` se interpolan directamente. Caracteres como `[` o `]` en títulos pueden romper el formato o inyectar enlaces engañosos al abrir el archivo en lectores de Markdown.
+- **Remediación:** Escapar caracteres especiales de sintaxis Markdown (`[`, `]`, `(`, `)`) antes de concatenar.
+
+---
+
+### 4. 🟢 LOW: SEC-04 — Validación de Tamaño de Archivo en Importación de Calendario
+- **Ubicación:** [`src/components/modals/CalendarImportModal.tsx:L123-L135`](file:///Users/eduardotorres/Developer/Roamly/src/components/modals/CalendarImportModal.tsx#L123-L135)
+- **Problema:** Se lee el contenido del archivo con `await file.text()` sin validar `file.size`.
+- **Remediación:** Agregar una validación simple `if (file.size > 5 * 1024 * 1024) throw Error(...)`.
+
+---
+
+## 🛡️ Controles de Seguridad Destacados (Buenas Prácticas)
+
+1. **Aislamiento de Claves de API:** `UNSPLASH_ACCESS_KEY` se lee exclusivamente en el proxy Edge y nunca en el cliente.
+2. **Sanitización de Archivos ICS:** [`icsParser.ts`](file:///Users/eduardotorres/Developer/Roamly/src/utils/icsParser.ts#L241-L261) elimina etiquetas HTML, esquemas `javascript:`, `data:`, `file:`, `blob:`, bloqueando vectores XSS antes del parseo.
+3. **Renderizado Seguro en React:** Ningún componente utiliza `dangerouslySetInnerHTML` con datos de usuario.
+4. **Content Security Policy (CSP):** `index.html` cuenta con una CSP restrictiva que bloquea `object-src`, `unsafe-eval` en producción y restringe `connect-src` e `img-src`.
