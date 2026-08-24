@@ -24,6 +24,11 @@ interface CalendarImportModalProps {
  */
 type Step = 'upload' | 'preview' | 'importing' | 'done'
 
+// Upper bound on accepted .ics size. Real calendar exports are a few KB to low MB;
+// anything larger is a mistake or an attempt to exhaust memory via file.text(),
+// so reject it before reading the file into a string.
+const MAX_ICS_BYTES = 5 * 1024 * 1024 // 5 MB
+
 /**
  * Converts a parsed ICSEvent into an Activity shape compatible with TripContext.
  *
@@ -122,6 +127,12 @@ export default function CalendarImportModal({ open, onClose }: CalendarImportMod
    */
   async function handleFile(file: File) {
     setError('')
+    // Reject oversized files up front so a huge upload can't exhaust memory in
+    // file.text() before we ever look at the contents.
+    if (file.size > MAX_ICS_BYTES) {
+      setError('That file is too large. Please choose an .ics file under 5 MB.')
+      return
+    }
     try {
       const text = await file.text()
       const { events: parsed } = parseICS(text)
