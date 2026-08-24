@@ -93,8 +93,10 @@ export async function fetchDestinationImage(
         // has to know Unsplash's response shape (or hold its credentials).
         const result = await res.json() as UnsplashResult
         if (result?.url && result?.thumb) {
-          // If Unsplash didn't supply coordinates, fall back to Nominatim
-          if (!result.lat || !result.lon) {
+          // If Unsplash didn't supply coordinates, fall back to Nominatim.
+          // Compare against null, not falsy: lat/lon of 0 (equator / prime
+          // meridian) are valid coordinates that `!result.lat` would wrongly reject.
+          if (result.lat == null || result.lon == null) {
             const geo = await geocodePlace(destination, signal)
             if (geo) {
               result.lat = geo.lat
