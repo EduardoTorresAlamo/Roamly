@@ -9,6 +9,12 @@ import type { Trip } from '@/types'
  * directly. Swapping persistence (e.g. to a Supabase-backed repo) then means
  * writing one new implementation of this interface and passing it to
  * `TripRepositoryProvider` — no changes to the context or components.
+ *
+ * Note: the localStorage-backed implementation stores trips as plaintext JSON.
+ * Anything with access to the browser profile (shared machine, malicious
+ * extension, XSS) can read it. Trip itineraries are low-sensitivity, so this is
+ * an accepted trade-off; a future encrypted implementation (Web Crypto + a
+ * user-derived key) could satisfy this same interface without touching consumers.
  */
 export interface TripRepository {
   /** All persisted trips in insertion order. */
@@ -23,6 +29,32 @@ export interface TripRepository {
 
 /** localStorage key holding the entire trip dataset (unchanged for back-compat). */
 export const TRIPS_STORAGE_KEY = 'wanderplan-trips'
+
+/**
+ * Structural runtime guard for a single persisted `Trip`.
+ *
+ * `JSON.parse` is typed `any`, so a `as Trip[]` cast is a lie the compiler can't
+ * check: hand-edited, truncated, or version-skewed localStorage would flow through
+ * as a `Trip` and blow up deep in a component. This validates the fields the app
+ * actually dereferences, so corruption is caught at the storage boundary and the
+ * read paths can degrade to an empty view (see `read()`).
+ */
+function isTrip(value: unknown): value is Trip {
+  if (typeof value !== 'object' || value === null) return false
+  const t = value as Record<string, unknown>
+  return (
+    typeof t.id === 'string' &&
+    typeof t.destination === 'string' &&
+    typeof t.startDate === 'string' &&
+    typeof t.endDate === 'string' &&
+    Array.isArray(t.days)
+  )
+}
+
+/** Runtime guard: the parsed value is an array of structurally-valid trips. */
+function isTripArray(value: unknown): value is Trip[] {
+  return Array.isArray(value) && value.every(isTrip)
+}
 
 /**
  * Thrown by the private `read()` when stored data exists but cannot be parsed.
@@ -75,13 +107,21 @@ export class LocalStorageTripRepository implements TripRepository {
     }
     // Missing key is a legitimately empty store, not corruption.
     if (raw === null) return []
+    let parsed: unknown
     try {
-      return JSON.parse(raw) as Trip[]
+      parsed = JSON.parse(raw)
     } catch (err) {
       // Data is present but unparseable. Throw instead of returning [] so a
       // subsequent save()/delete() does not overwrite (and destroy) it.
       throw new TripRepositoryReadError(this.key, err)
     }
+    // Syntactically valid JSON can still be the wrong shape (hand-edited, or from
+    // an incompatible app version). Validate before trusting the `Trip[]` type so
+    // corruption is caught here rather than surfacing as a crash in a component.
+    if (!isTripArray(parsed)) {
+      throw new TripRepositoryReadError(this.key, new Error('stored value is not a Trip[]'))
+    }
+    return parsed
   }
 
   private write(trips: Trip[]): void {
