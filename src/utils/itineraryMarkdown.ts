@@ -2,6 +2,22 @@ import { formatDate, formatDateRange, getTripDurationDays } from '@/utils/dates'
 import { ACTIVITY_META } from '@/utils/activityIcons'
 import type { Trip } from '@/types'
 
+// Markdown control characters that must be neutralized in user-supplied text so a
+// destination/title/note cannot inject headings, links, blockquotes, or emphasis
+// into the exported document. Backslash is first so the escapes it introduces are
+// not themselves re-escaped.
+const MD_SPECIAL = /[\\`*_[\]()#>]/g
+
+/**
+ * Backslash-escapes markdown control characters in user-supplied text.
+ *
+ * @param text - Raw user text (destination, activity title, notes)
+ * @returns Text safe to embed in the generated markdown
+ */
+function escapeMarkdown(text: string): string {
+  return text.replace(MD_SPECIAL, (ch) => `\\${ch}`)
+}
+
 /**
  * Serializes an entire trip into a human-readable markdown itinerary:
  * a destination heading, a date-range/duration summary, then one section per
@@ -10,7 +26,7 @@ import type { Trip } from '@/types'
 export function generateItineraryMarkdown(trip: Trip): string {
   const duration = getTripDurationDays(trip.startDate, trip.endDate)
   const lines: string[] = [
-    `# ${trip.destination}`,
+    `# ${escapeMarkdown(trip.destination)}`,
     '',
     `${formatDateRange(trip.startDate, trip.endDate)} · ${duration} ${duration === 1 ? 'day' : 'days'}`,
     '',
@@ -32,8 +48,8 @@ export function generateItineraryMarkdown(trip: Trip): string {
     sorted.forEach((activity) => {
       const label = ACTIVITY_META[activity.type].label
       const time = activity.startTime ? `${activity.startTime} · ` : ''
-      lines.push(`- **${time}${activity.title}** _(${label})_`)
-      if (activity.notes) lines.push(`  ${activity.notes}`)
+      lines.push(`- **${time}${escapeMarkdown(activity.title)}** _(${label})_`)
+      if (activity.notes) lines.push(`  ${escapeMarkdown(activity.notes)}`)
     })
     lines.push('')
   })
