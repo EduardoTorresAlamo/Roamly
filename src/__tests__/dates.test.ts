@@ -5,7 +5,6 @@ import {
   formatDate,
   formatDateRange,
   getDayLabel,
-  getDayTabLabel,
   getTripDurationDays,
 } from '@/utils/dates'
 
@@ -91,12 +90,6 @@ describe('getDayLabel', () => {
   it('is 1-indexed', () => {
     expect(getDayLabel(0)).toBe('Day 1')
     expect(getDayLabel(4)).toBe('Day 5')
-  })
-})
-
-describe('getDayTabLabel', () => {
-  it('combines the 1-indexed day number with the formatted date', () => {
-    expect(getDayTabLabel(0, '2024-10-12')).toBe('Day 1 - Oct 12')
   })
 })
 

@@ -110,17 +110,6 @@ export function getDayLabel(index: number): string {
 }
 
 /**
- * Returns a combined day label with date for verbose tab display.
- *
- * @param index - Zero-based day index within the trip
- * @param date - Date in YYYY-MM-DD format
- * @returns Label string, e.g. "Day 1 - Oct 12"
- */
-export function getDayTabLabel(index: number, date: string): string {
-  return `Day ${index + 1} - ${formatDate(date)}`
-}
-
-/**
  * Calculates the total number of days in a trip, including both endpoints.
  *
  * The +1 makes a one-night stay count as 1 day (start == end = 1, not 0).
