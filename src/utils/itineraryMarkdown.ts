@@ -24,12 +24,14 @@ export function generateItineraryMarkdown(trip: Trip): string {
       return
     }
 
-    // Chronological order by HH:mm start time (lexicographic matches chronological)
-    const sorted = [...day.activities].sort((a, b) => a.startTime.localeCompare(b.startTime))
+    // Chronological order by HH:mm start time (lexicographic matches chronological);
+    // untimed activities ('' sentinel) sort first
+    const sorted = [...day.activities].sort((a, b) =>
+      (a.startTime ?? '').localeCompare(b.startTime ?? ''),
+    )
     sorted.forEach((activity) => {
       const label = ACTIVITY_META[activity.type].label
-      const time =
-        activity.startTime && activity.startTime !== '00:00' ? `${activity.startTime} · ` : ''
+      const time = activity.startTime ? `${activity.startTime} · ` : ''
       lines.push(`- **${time}${activity.title}** _(${label})_`)
       if (activity.notes) lines.push(`  ${activity.notes}`)
     })

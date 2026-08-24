@@ -27,14 +27,14 @@ interface ActivityItemProps {
 /**
  * Converts a 24-hour HH:mm time string to a 12-hour AM/PM display string.
  *
- * Returns an empty string for midnight ("00:00") which is used as the default
- * startTime placeholder when the user does not specify a time.
+ * Returns an empty string when there is no time (empty/undefined sentinel). A
+ * genuine "00:00" now formats as "12:00 AM" -- only the empty sentinel is untimed.
  *
- * @param time - Time string in HH:mm format
- * @returns Formatted time string, e.g. "9:30 AM", or "" for 00:00
+ * @param time - Time string in HH:mm format, or empty/undefined when untimed
+ * @returns Formatted time string, e.g. "9:30 AM", or "" when untimed
  */
-function formatTime(time: string): string {
-  if (!time || time === '00:00') return ''
+function formatTime(time?: string): string {
+  if (!time) return ''
   const [hours, minutes] = time.split(':').map(Number)
   const period = hours >= 12 ? 'PM' : 'AM'
   // Convert 0 to 12 for 12-hour display (0 % 12 === 0, so || 12 handles midnight/noon)

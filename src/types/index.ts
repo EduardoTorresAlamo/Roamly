@@ -21,8 +21,12 @@ export interface Activity {
   id: string
   type: ActivityType
   title: string
-  /** HH:mm format, required for timeline sorting */
-  startTime: string
+  /**
+   * Start time in HH:mm (24-hour) format, or empty/undefined when the activity is
+   * untimed. Empty is the single sentinel for "no time" -- distinct from a genuine
+   * "00:00" midnight, which is now preserved as a real timed value.
+   */
+  startTime?: string
   /** HH:mm format, optional end time */
   endTime?: string
   notes?: string

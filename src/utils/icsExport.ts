@@ -148,9 +148,9 @@ function nowUTCStamp(): string {
  *     calendar month view. Its DTEND is exclusive per RFC 5545, hence endDate + 1.
  *   - One timed event per activity, ordered chronologically within each day.
  *
- * Activities with no meaningful start time (missing, or the "00:00" placeholder the
- * add form defaults to) become all-day events on their day instead of midnight
- * events, which is how calendar apps display an untimed plan.
+ * Activities with no start time (the empty/undefined sentinel) become all-day
+ * events on their day, which is how calendar apps display an untimed plan. A
+ * genuine "00:00" is now kept as a real midnight timed event.
  *
  * @param trip - The trip to serialize
  * @returns Full .ics file content with CRLF line endings
@@ -194,18 +194,21 @@ export function generateTripICS(trip: Trip): string {
   )
 
   trip.days.forEach((day, dayIndex) => {
-    // Lexicographic order on HH:mm matches chronological order
-    const sorted = [...day.activities].sort((a, b) => a.startTime.localeCompare(b.startTime))
+    // Lexicographic order on HH:mm matches chronological order; untimed ('') sorts first
+    const sorted = [...day.activities].sort((a, b) =>
+      (a.startTime ?? '').localeCompare(b.startTime ?? ''),
+    )
 
     sorted.forEach((activity) => {
       const label = ACTIVITY_META[activity.type].label
       const notes = [`Day ${dayIndex + 1} · ${label}`, activity.notes].filter(Boolean).join('\n')
-      const hasTime = Boolean(activity.startTime) && activity.startTime !== '00:00'
+      const startTime = activity.startTime
+      const hasTime = Boolean(startTime)
 
       const dateProps = hasTime
         ? [
-            `DTSTART:${toICSDateTime(day.date, activity.startTime)}`,
-            `DTEND:${toICSDateTime(day.date, activity.endTime || addMinutes(activity.startTime, DEFAULT_DURATION_MIN))}`,
+            `DTSTART:${toICSDateTime(day.date, startTime!)}`,
+            `DTEND:${toICSDateTime(day.date, activity.endTime || addMinutes(startTime!, DEFAULT_DURATION_MIN))}`,
           ]
         : [
             `DTSTART;VALUE=DATE:${toICSDate(day.date)}`,

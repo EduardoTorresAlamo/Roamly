@@ -38,9 +38,9 @@ function eventToActivity(event: ICSEvent): Omit<Activity, 'id'> {
   // Slice characters 11-16 from "YYYY-MM-DDTHH:MM:SS" to get "HH:MM".
   // Date-only values ("YYYY-MM-DD", from all-day events) yield '' here.
   const timeFrom = (iso?: string) => (iso ? iso.slice(11, 16) : '')
-  // Start times fall back to '00:00' (the "no time" placeholder used for
-  // timeline sorting); end times stay undefined when the event has none.
-  const startTime = timeFrom(event.dtStart) || '00:00'
+  // An all-day event has no time, so startTime stays '' -- the untimed sentinel.
+  // (Not '00:00', which now means a real midnight event.)
+  const startTime = timeFrom(event.dtStart)
   const endTime = timeFrom(event.dtEnd) || undefined
 
   if (event.type === 'flight') {

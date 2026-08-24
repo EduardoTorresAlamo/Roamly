@@ -35,8 +35,8 @@ const trip: Trip = {
       id: 'day-2',
       date: '2024-10-13',
       activities: [
-        // "00:00" is the placeholder the add form uses when no time is entered
-        { id: 'a3', type: 'lodging', title: 'Check out', startTime: '00:00' },
+        // Empty startTime is the untimed sentinel (no time entered)
+        { id: 'a3', type: 'lodging', title: 'Check out', startTime: '' },
       ],
     },
   ],
