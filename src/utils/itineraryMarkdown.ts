@@ -1,5 +1,5 @@
 import { formatDate, formatDateRange, getTripDurationDays } from '@/utils/dates'
-import { ACTIVITY_META } from '@/utils/activityIcons'
+import { getActivityMeta } from '@/utils/activityIcons'
 import type { Trip } from '@/types'
 
 // Markdown control characters that must be neutralized in user-supplied text so a
@@ -46,7 +46,7 @@ export function generateItineraryMarkdown(trip: Trip): string {
       (a.startTime ?? '').localeCompare(b.startTime ?? ''),
     )
     sorted.forEach((activity) => {
-      const label = ACTIVITY_META[activity.type].label
+      const label = getActivityMeta(activity.type).label
       const time = activity.startTime ? `${activity.startTime} · ` : ''
       lines.push(`- **${time}${escapeMarkdown(activity.title)}** _(${label})_`)
       if (activity.notes) lines.push(`  ${escapeMarkdown(activity.notes)}`)

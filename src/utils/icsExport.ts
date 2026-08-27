@@ -12,7 +12,7 @@
  */
 
 import type { Trip } from '@/types'
-import { ACTIVITY_META } from './activityIcons'
+import { getActivityMeta } from './activityIcons'
 
 /** Product identifier advertised in the generated calendar */
 const PRODID = '-//Roamly//Trip Itinerary//EN'
@@ -200,7 +200,7 @@ export function generateTripICS(trip: Trip): string {
     )
 
     sorted.forEach((activity) => {
-      const label = ACTIVITY_META[activity.type].label
+      const label = getActivityMeta(activity.type).label
       const notes = [`Day ${dayIndex + 1} · ${label}`, activity.notes].filter(Boolean).join('\n')
       const startTime = activity.startTime
       const hasTime = Boolean(startTime)

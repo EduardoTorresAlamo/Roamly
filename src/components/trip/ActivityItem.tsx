@@ -1,6 +1,6 @@
 import { Trash2, MapPin, GripVertical } from 'lucide-react'
 import type { Activity } from '@/types'
-import { ACTIVITY_META } from '@/utils/activityIcons'
+import { getActivityMeta } from '@/utils/activityIcons'
 import { cn } from '@/lib/utils'
 
 interface ActivityItemProps {
@@ -66,7 +66,7 @@ export default function ActivityItem({
   isDragging,
   isDragOver,
 }: ActivityItemProps) {
-  const meta = ACTIVITY_META[activity.type]
+  const meta = getActivityMeta(activity.type)
   const Icon = meta.icon
 
   const startFormatted = formatTime(activity.startTime)

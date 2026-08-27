@@ -6,7 +6,7 @@ import type { ActivityType } from '@/types'
  * Centralizing these here ensures icon, color, and label stay
  * in sync across the type-picker, timeline items, and map markers.
  */
-interface ActivityMeta {
+export interface ActivityMeta {
   /** Lucide icon component rendered in activity cards and type-picker buttons */
   icon: LucideIcon
   /** Tailwind background class applied to the icon circle (e.g. 'bg-blue-100') */
@@ -46,4 +46,22 @@ export const ACTIVITY_META: Record<ActivityType, ActivityMeta> = {
     color: 'text-green-600',
     label: 'Activity',
   },
+}
+
+/**
+ * Resolves an activity's display metadata, falling back to the generic
+ * 'activity' entry for any unrecognized type.
+ *
+ * `Activity.type` is typed as `ActivityType`, but that guarantee only holds for
+ * values the compiler saw: trips are rehydrated from localStorage via JSON.parse
+ * and can carry a stale or hand-edited type (e.g. 'hotel', 'other'). Indexing
+ * ACTIVITY_META directly then yields `undefined`, and reading `.icon` or `.label`
+ * off it throws a TypeError deep inside a render or an export. Routing every
+ * lookup through here degrades an unknown category to a neutral pin instead.
+ *
+ * @param type - Activity category, trusted or otherwise
+ * @returns Display metadata; never undefined
+ */
+export function getActivityMeta(type: string): ActivityMeta {
+  return ACTIVITY_META[type as ActivityType] ?? ACTIVITY_META.activity
 }
