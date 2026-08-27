@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Plus, ChevronLeft, CalendarDays, CalendarArrowDown, Map, ChevronUp, Download, Check } from 'lucide-react'
+import { Plus, ChevronLeft, CalendarDays, CalendarArrowDown, Map, ChevronUp, Download, Check, AlertCircle } from 'lucide-react'
 import { useTripActions, useTripById } from '@/hooks/useTrips'
 import { formatDateRange, getTripDurationDays } from '@/utils/dates'
 import { downloadTripICS } from '@/utils/icsExport'
@@ -41,6 +41,8 @@ export default function TripDetail() {
   const [copied, setCopied] = useState(false)
   // Brief confirmation shown after the .ics calendar file is downloaded
   const [calendarExported, setCalendarExported] = useState(false)
+  // Message shown when an export fails, or null when the last export succeeded
+  const [exportError, setExportError] = useState<string | null>(null)
   // Id of the activity awaiting delete confirmation, or null when no prompt is open
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
@@ -57,6 +59,14 @@ export default function TripDetail() {
     const timer = setTimeout(() => setCalendarExported(false), 2000)
     return () => clearTimeout(timer)
   }, [calendarExported])
+
+  // Failures linger a little longer than confirmations -- the user has to read
+  // and act on them, not just register that something worked.
+  useEffect(() => {
+    if (exportError === null) return
+    const timer = setTimeout(() => setExportError(null), 4000)
+    return () => clearTimeout(timer)
+  }, [exportError])
 
   // Center the map on this trip's destination whenever the tripId route param changes.
   // clearFocus() dismisses any NearbyPanel left over from a previously viewed trip.
@@ -150,10 +160,12 @@ export default function TripDetail() {
   async function handleExport() {
     try {
       await navigator.clipboard.writeText(generateItineraryMarkdown(trip!))
+      setExportError(null)
       setCopied(true)
     } catch {
-      // Clipboard access can fail (e.g. denied permission or insecure context);
-      // fail silently rather than crashing the page.
+      // Clipboard access can fail (denied permission, insecure context). Surface
+      // it: the button otherwise just does nothing and the user retries forever.
+      setExportError('Could not copy — clipboard access was blocked.')
     }
   }
 
@@ -164,10 +176,12 @@ export default function TripDetail() {
   function handleExportCalendar() {
     try {
       downloadTripICS(trip!)
+      setExportError(null)
       setCalendarExported(true)
     } catch {
-      // Blob/object-URL creation can fail in restrictive environments; fail
-      // silently rather than crashing the page.
+      // Blob/object-URL creation can fail in restrictive environments. Surface
+      // it rather than leaving the download button silently inert.
+      setExportError('Could not download the calendar file.')
     }
   }
 
@@ -336,17 +350,28 @@ export default function TripDetail() {
         <Plus className="w-7 h-7 stroke-[2.5]" />
       </button>
 
-      {/* ── Export confirmation toast (shared by both export actions) ── */}
+      {/* ── Export status toast (shared by both export actions, success and failure) ── */}
       <div
         className={cn(
           'fixed top-6 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 glass-panel rounded-full px-4 py-2 text-sm font-medium text-white transition-all duration-300',
-          copied || calendarExported ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 pointer-events-none',
+          copied || calendarExported || exportError !== null
+            ? 'opacity-100 translate-y-0'
+            : 'opacity-0 -translate-y-2 pointer-events-none',
         )}
         role="status"
         aria-live="polite"
       >
-        <Check className="w-4 h-4 text-accent" />
-        {copied ? 'Itinerary copied!' : 'Calendar downloaded!'}
+        {exportError !== null ? (
+          <>
+            <AlertCircle className="w-4 h-4 text-red-400" />
+            {exportError}
+          </>
+        ) : (
+          <>
+            <Check className="w-4 h-4 text-accent" />
+            {copied ? 'Itinerary copied!' : 'Calendar downloaded!'}
+          </>
+        )}
       </div>
 
       <AddActivityModal
