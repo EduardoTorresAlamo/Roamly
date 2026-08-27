@@ -6,6 +6,7 @@ import {
   formatDateRange,
   getDayLabel,
   getTripDurationDays,
+  MAX_TRIP_DAYS,
 } from '@/utils/dates'
 
 describe('generateDayPlans', () => {
@@ -17,6 +18,14 @@ describe('generateDayPlans', () => {
       '2024-10-14',
       '2024-10-15',
     ])
+  })
+
+  it('clamps an absurd range at MAX_TRIP_DAYS instead of hanging the tab', () => {
+    // A typo'd or hand-edited far-future end date would otherwise allocate
+    // millions of DayPlans synchronously.
+    const days = generateDayPlans('2024-10-12', '9999-12-31')
+    expect(days).toHaveLength(MAX_TRIP_DAYS)
+    expect(days[0].date).toBe('2024-10-12')
   })
 
   it('returns a single day when start equals end', () => {

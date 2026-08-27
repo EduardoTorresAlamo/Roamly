@@ -28,6 +28,17 @@ function toISODate(date: Date): string {
 }
 
 /**
+ * Upper bound on days a single trip may span (~2 years).
+ *
+ * Without it, an end date like 9999-12-31 — reachable by a typo in the date
+ * picker or a hand-edited localStorage entry — makes the loop below allocate
+ * millions of DayPlan objects synchronously, freezing the tab until it OOMs.
+ * Two years is far past any realistic itinerary, so clamping is invisible in
+ * practice while bounding the worst case.
+ */
+export const MAX_TRIP_DAYS = 730
+
+/**
  * Generates one DayPlan entry for every calendar day from startDate to endDate, inclusive.
  *
  * Dates are constructed and incremented purely in UTC (Date.UTC + setUTCDate) so the
@@ -35,7 +46,7 @@ function toISODate(date: Date): string {
  *
  * @param startDate - Trip start in YYYY-MM-DD format
  * @param endDate - Trip end in YYYY-MM-DD format
- * @returns An array of empty DayPlan objects, one per day
+ * @returns An array of empty DayPlan objects, one per day, capped at MAX_TRIP_DAYS
  */
 export function generateDayPlans(startDate: string, endDate: string): DayPlan[] {
   const days: DayPlan[] = []
@@ -43,7 +54,7 @@ export function generateDayPlans(startDate: string, endDate: string): DayPlan[] 
   const end = parseISODate(endDate)
 
   // Invalid input yields NaN timestamps; the comparison below is false, so we return []
-  while (current <= end) {
+  while (current <= end && days.length < MAX_TRIP_DAYS) {
     days.push({
       id: generateId(),
       date: toISODate(current),
