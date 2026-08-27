@@ -81,11 +81,20 @@ const dateFormatter = new Intl.DateTimeFormat('en-US', {
 /**
  * Formats an ISO date string as a short human-readable date.
  *
+ * `Intl.DateTimeFormat.format()` throws `RangeError: Invalid time value` on an
+ * Invalid Date, which a corrupted or hand-edited localStorage entry can easily
+ * produce. Since this runs during render in TripCard, TripDetail, and DayTabs,
+ * a throw here takes down the whole subtree. Fall back to echoing the raw input
+ * so one bad date degrades to unformatted text instead of a blank screen.
+ *
  * @param isoDate - Date in YYYY-MM-DD format
- * @returns Formatted string, e.g. "Oct 12"
+ * @returns Formatted string (e.g. "Oct 12"), or the raw input if unparseable
  */
 export function formatDate(isoDate: string): string {
-  return dateFormatter.format(parseISODate(isoDate))
+  if (!isoDate) return ''
+  const date = parseISODate(isoDate)
+  if (Number.isNaN(date.getTime())) return isoDate
+  return dateFormatter.format(date)
 }
 
 /**

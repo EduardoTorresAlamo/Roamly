@@ -78,6 +78,18 @@ describe('formatDate', () => {
     // A UTC-anchored parse keeps Jan 1 as "Jan 1" rather than slipping to Dec 31.
     expect(formatDate('2024-01-01')).toBe('Jan 1')
   })
+
+  it('returns an empty string for an empty input instead of throwing', () => {
+    expect(formatDate('')).toBe('')
+  })
+
+  it('echoes an unparseable date rather than throwing RangeError', () => {
+    // Intl.DateTimeFormat.format() throws on an Invalid Date; corrupted
+    // localStorage must degrade to raw text, not crash the render tree.
+    expect(formatDate('not-a-date')).toBe('not-a-date')
+    // Truncated entry: no day component, so parseISODate yields Invalid Date.
+    expect(formatDate('2024-10')).toBe('2024-10')
+  })
 })
 
 describe('formatDateRange', () => {
