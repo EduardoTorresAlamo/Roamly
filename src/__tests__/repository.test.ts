@@ -103,6 +103,54 @@ describe('LocalStorageTripRepository', () => {
     )
   })
 
+  it('rejects a trip whose day is missing required fields', () => {
+    // Passes the old shallow guard (days is an array) but crashes DayTabs, which
+    // dereferences day.date and day.activities unconditionally.
+    memoryStorage.setItem(
+      TRIPS_STORAGE_KEY,
+      JSON.stringify([{ ...sampleTrip, days: [{ id: 'day-1' }] }]),
+    )
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const repo = new LocalStorageTripRepository(TRIPS_STORAGE_KEY, memoryStorage)
+    expect(repo.getAll()).toEqual([])
+    expect(consoleSpy).toHaveBeenCalledWith(expect.any(TripRepositoryReadError))
+  })
+
+  it('rejects a trip whose activity is missing required fields', () => {
+    memoryStorage.setItem(
+      TRIPS_STORAGE_KEY,
+      JSON.stringify([
+        {
+          ...sampleTrip,
+          days: [{ id: 'day-1', date: '2024-10-12', activities: [{ id: 'a-1' }] }],
+        },
+      ]),
+    )
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const repo = new LocalStorageTripRepository(TRIPS_STORAGE_KEY, memoryStorage)
+    expect(repo.getAll()).toEqual([])
+    expect(consoleSpy).toHaveBeenCalledWith(expect.any(TripRepositoryReadError))
+  })
+
+  it('accepts a fully-populated trip with days and activities', () => {
+    const populated: Trip = {
+      ...sampleTrip,
+      days: [
+        {
+          id: 'day-1',
+          date: '2024-10-12',
+          activities: [{ id: 'a-1', type: 'dining', title: 'Ramen' }],
+        },
+      ],
+    }
+    memoryStorage.setItem(TRIPS_STORAGE_KEY, JSON.stringify([populated]))
+
+    const repo = new LocalStorageTripRepository(TRIPS_STORAGE_KEY, memoryStorage)
+    expect(repo.getAll()).toEqual([populated])
+  })
+
   it('handles storage write errors gracefully', () => {
     const failingStorage: Storage = {
       length: 0,

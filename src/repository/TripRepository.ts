@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import type { Trip } from '@/types'
+import type { Activity, DayPlan, Trip } from '@/types'
 
 /**
  * Storage-agnostic persistence boundary for trips.
@@ -31,6 +31,31 @@ export interface TripRepository {
 export const TRIPS_STORAGE_KEY = 'wanderplan-trips'
 
 /**
+ * Structural runtime guard for a single persisted `Activity`.
+ *
+ * Only the fields every render path dereferences unconditionally are required;
+ * the optional ones (times, coordinates, flight extras) are already handled as
+ * possibly-absent by their consumers.
+ */
+function isActivity(value: unknown): value is Activity {
+  if (typeof value !== 'object' || value === null) return false
+  const a = value as Record<string, unknown>
+  return typeof a.id === 'string' && typeof a.type === 'string' && typeof a.title === 'string'
+}
+
+/** Structural runtime guard for a single persisted `DayPlan`. */
+function isDayPlan(value: unknown): value is DayPlan {
+  if (typeof value !== 'object' || value === null) return false
+  const d = value as Record<string, unknown>
+  return (
+    typeof d.id === 'string' &&
+    typeof d.date === 'string' &&
+    Array.isArray(d.activities) &&
+    d.activities.every(isActivity)
+  )
+}
+
+/**
  * Structural runtime guard for a single persisted `Trip`.
  *
  * `JSON.parse` is typed `any`, so a `as Trip[]` cast is a lie the compiler can't
@@ -38,6 +63,11 @@ export const TRIPS_STORAGE_KEY = 'wanderplan-trips'
  * as a `Trip` and blow up deep in a component. This validates the fields the app
  * actually dereferences, so corruption is caught at the storage boundary and the
  * read paths can degrade to an empty view (see `read()`).
+ *
+ * Validation recurses into `days` and their `activities`: checking only
+ * `Array.isArray(days)` let a malformed day or activity through the boundary,
+ * which then surfaced as a dereference crash inside DayTabs or ActivityTimeline
+ * — exactly the failure this guard exists to prevent.
  */
 function isTrip(value: unknown): value is Trip {
   if (typeof value !== 'object' || value === null) return false
@@ -47,7 +77,8 @@ function isTrip(value: unknown): value is Trip {
     typeof t.destination === 'string' &&
     typeof t.startDate === 'string' &&
     typeof t.endDate === 'string' &&
-    Array.isArray(t.days)
+    Array.isArray(t.days) &&
+    t.days.every(isDayPlan)
   )
 }
 
