@@ -88,6 +88,52 @@ function isTripArray(value: unknown): value is Trip[] {
 }
 
 /**
+ * Current version of the persisted payload shape.
+ *
+ * Bump this whenever the on-disk `Trip` shape changes incompatibly, and add the
+ * corresponding step to `migrate()`.
+ */
+export const SCHEMA_VERSION = 1
+
+/**
+ * Versioned envelope written to storage.
+ *
+ * The original format was a bare `Trip[]` with no metadata, which left no way to
+ * tell an old payload from a new one — any future shape change would have had to
+ * guess. Wrapping the array in an envelope makes the version explicit going
+ * forward; a bare array read back is treated as the implicit version 0.
+ */
+interface TripEnvelope {
+  schemaVersion: number
+  trips: Trip[]
+}
+
+/**
+ * Normalizes any recognized stored payload into the current in-memory `Trip[]`.
+ *
+ * Accepts the legacy bare array (version 0) so existing users keep their data
+ * without an explicit upgrade step, and the versioned envelope written since.
+ * An unknown or newer `schemaVersion` is rejected rather than guessed at: a
+ * payload from a future build could be silently mangled by this older reader.
+ *
+ * @param parsed - Result of JSON.parse on the raw stored string
+ * @returns The contained trips, or null if the payload is not a recognized shape
+ */
+function migrate(parsed: unknown): Trip[] | null {
+  // Version 0: the pre-envelope format, a bare Trip[].
+  if (isTripArray(parsed)) return parsed
+
+  if (typeof parsed !== 'object' || parsed === null) return null
+  const envelope = parsed as Record<string, unknown>
+  if (typeof envelope.schemaVersion !== 'number') return null
+  // Reading a payload written by a newer build would risk dropping fields this
+  // version does not know about, so refuse instead of downgrading it.
+  if (envelope.schemaVersion > SCHEMA_VERSION) return null
+  if (!isTripArray(envelope.trips)) return null
+  return envelope.trips
+}
+
+/**
  * Thrown by the private `read()` when stored data exists but cannot be parsed.
  *
  * Distinguishes a genuinely empty store (missing key → `[]`) from corrupted
@@ -147,17 +193,25 @@ export class LocalStorageTripRepository implements TripRepository {
       throw new TripRepositoryReadError(this.key, err)
     }
     // Syntactically valid JSON can still be the wrong shape (hand-edited, or from
-    // an incompatible app version). Validate before trusting the `Trip[]` type so
-    // corruption is caught here rather than surfacing as a crash in a component.
-    if (!isTripArray(parsed)) {
-      throw new TripRepositoryReadError(this.key, new Error('stored value is not a Trip[]'))
+    // an incompatible app version). Validate and version-normalize before trusting
+    // the `Trip[]` type so corruption is caught here rather than surfacing as a
+    // crash in a component.
+    const trips = migrate(parsed)
+    if (trips === null) {
+      throw new TripRepositoryReadError(
+        this.key,
+        new Error('stored value is not a recognized trip payload'),
+      )
     }
-    return parsed
+    return trips
   }
 
   private write(trips: Trip[]): void {
+    // Always writes the current envelope, so a store read as legacy version 0 is
+    // upgraded in place by the next save()/delete().
+    const envelope: TripEnvelope = { schemaVersion: SCHEMA_VERSION, trips }
     try {
-      this.storage.setItem(this.key, JSON.stringify(trips))
+      this.storage.setItem(this.key, JSON.stringify(envelope))
     } catch (err) {
       console.error(`LocalStorageTripRepository: failed to persist "${this.key}"`, err)
     }

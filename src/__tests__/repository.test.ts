@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { LocalStorageTripRepository, TRIPS_STORAGE_KEY, TripRepositoryReadError } from '@/repository/TripRepository'
+import {
+  LocalStorageTripRepository,
+  SCHEMA_VERSION,
+  TRIPS_STORAGE_KEY,
+  TripRepositoryReadError,
+} from '@/repository/TripRepository'
 import type { Trip } from '@/types'
 
 const sampleTrip: Trip = {
@@ -149,6 +154,44 @@ describe('LocalStorageTripRepository', () => {
 
     const repo = new LocalStorageTripRepository(TRIPS_STORAGE_KEY, memoryStorage)
     expect(repo.getAll()).toEqual([populated])
+  })
+
+  it('reads a legacy bare-array payload written before schema versioning', () => {
+    memoryStorage.setItem(TRIPS_STORAGE_KEY, JSON.stringify([sampleTrip]))
+
+    const repo = new LocalStorageTripRepository(TRIPS_STORAGE_KEY, memoryStorage)
+    expect(repo.getAll()).toEqual([sampleTrip])
+  })
+
+  it('upgrades a legacy payload to the versioned envelope on the next write', () => {
+    memoryStorage.setItem(TRIPS_STORAGE_KEY, JSON.stringify([sampleTrip]))
+
+    const repo = new LocalStorageTripRepository(TRIPS_STORAGE_KEY, memoryStorage)
+    repo.save(sampleTrip2)
+
+    const raw = JSON.parse(memoryStorage.getItem(TRIPS_STORAGE_KEY) as string)
+    expect(raw).toEqual({ schemaVersion: SCHEMA_VERSION, trips: [sampleTrip, sampleTrip2] })
+  })
+
+  it('writes the versioned envelope', () => {
+    const repo = new LocalStorageTripRepository(TRIPS_STORAGE_KEY, memoryStorage)
+    repo.save(sampleTrip)
+
+    const raw = JSON.parse(memoryStorage.getItem(TRIPS_STORAGE_KEY) as string)
+    expect(raw.schemaVersion).toBe(SCHEMA_VERSION)
+    expect(raw.trips).toEqual([sampleTrip])
+  })
+
+  it('refuses a payload from a newer schema version rather than mangling it', () => {
+    memoryStorage.setItem(
+      TRIPS_STORAGE_KEY,
+      JSON.stringify({ schemaVersion: SCHEMA_VERSION + 1, trips: [sampleTrip] }),
+    )
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const repo = new LocalStorageTripRepository(TRIPS_STORAGE_KEY, memoryStorage)
+    expect(repo.getAll()).toEqual([])
+    expect(consoleSpy).toHaveBeenCalledWith(expect.any(TripRepositoryReadError))
   })
 
   it('handles storage write errors gracefully', () => {
